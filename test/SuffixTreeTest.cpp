@@ -221,6 +221,64 @@ namespace tst{
         assert(7778 == *it1);
     }
 
+    void copyEmptyContainerTest()
+    {
+        ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
+        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        assert(0 == cont.size());
+
+        suffix_tree::SuffixTree<ContBuilder, std::string, int> contCopy(cont);
+        assert(0 == contCopy.size());
+
+        auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
+        assert(1 == cont.size());
+        assert(cont.end() != it);
+        assert(777 == *it);
+
+        auto it1 = contCopy.find("aaa-bbb-ccc-ddd");
+        assert(contCopy.end() == it1);
+    }
+
+    void copyContainerTest()
+    {
+        ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
+        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        assert(0 == cont.size());
+        auto it2 = cont.insert("aaa-bbb-ccc-ddd", 777);
+        auto it1 = cont.insert("aaa-bba-cca-dda", 1111);
+        auto it3 = cont.insert("aaz-bba-cca-dda", 8888);
+        auto it4 = cont.insert("aaz-bbz-ccz-ddz", 99);
+        assert(4 == cont.size());
+        assert(cont.end() != it1);
+        assert(1111 == *it1);
+        assert(cont.end() != it2);
+        assert(777 == *it2);
+        assert(cont.end() != it3);
+        assert(8888 == *it3);
+        assert(cont.end() != it4);
+        assert(99 == *it4);
+
+        suffix_tree::SuffixTree<ContBuilder, std::string, int> contCopy(cont);
+        assert(4 == contCopy.size());
+        *it1 = 11112;
+        *it2 = 7772;
+        *it3 = 88882;
+        *it4 = 992;
+
+        auto cit = contCopy.find("aaa-bba-cca-dda");
+        assert(contCopy.end() != cit);
+        assert(1111 == *cit);
+        cit = contCopy.find("aaa-bbb-ccc-ddd");
+        assert(contCopy.end() != cit);
+        assert(777 == *cit);
+        cit = contCopy.find("aaz-bba-cca-dda");
+        assert(contCopy.end() != cit);
+        assert(8888 == *cit);
+        cit = contCopy.find("aaz-bbz-ccz-ddz");
+        assert(contCopy.end() != cit);
+        assert(99 == *cit);
+    }
+
     void fillContainerTest()
     {
         HighPerfTimer timer;
@@ -662,6 +720,8 @@ namespace tst{
         eraseAgainByKeyTest();
         eraseByIteratorTest();
         setByIteratorTest();
+        copyEmptyContainerTest();
+        copyContainerTest();
         fillContainerTest();
         fillStlMapContainerTest();
         fillStlComplexMapContainerTest();

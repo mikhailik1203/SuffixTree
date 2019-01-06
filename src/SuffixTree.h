@@ -34,6 +34,32 @@ namespace suffix_tree_impl{
             clear();
         }
 
+        RootNode(
+                const RootNode &nd):
+            metaInfo_(nd.metaInfo_)
+        {
+            SubNotesT tmp;
+            tmp.reserve(nd.childNodes_.size());  
+            std::for_each(
+                std::begin(nd.childNodes_), std::end(nd.childNodes_), 
+                [&](const ChildNodeT *val){
+                    std::unique_ptr<ChildNodeT> chld;
+                    if(nullptr != val){
+                        chld = std::unique_ptr<ChildNodeT>(new ChildNodeT(this, metaInfo_));
+                        chld->copy(*val);
+                    }
+                    tmp.push_back(chld.get());
+                    chld.release();
+                });
+            std::swap(tmp, childNodes_);
+        }
+
+        RootNode &operator=(
+                const RootNode nd)
+        {
+            std::swap(metaInfo_, nd.metaInfo_);
+            std::swap(childNodes_, nd.childNodes_);
+        }
 
         ChildNodeT *getChild(
                 IndexT index)
@@ -109,6 +135,25 @@ namespace suffix_tree_impl{
             clear();
         }
 
+        void copy(
+                const SuffixNode &nd)
+        {
+            SubNotesT tmp;
+            tmp.reserve(nd.childNodes_.size());  
+            std::for_each(
+                std::begin(nd.childNodes_), std::end(nd.childNodes_), 
+                [&](const ChildNodeT *val){
+                    std::unique_ptr<ChildNodeT> chld;
+                    if(nullptr != val){
+                        chld = std::unique_ptr<ChildNodeT>(new ChildNodeT(this, metaInfo_));
+                        chld->copy(*val);
+                    }
+                    tmp.push_back(chld.get());
+                    chld.release();
+                });
+            std::swap(tmp, childNodes_);
+        }
+
         ChildNodeT *getChild(
                 IndexT index)
         {
@@ -174,6 +219,9 @@ namespace suffix_tree_impl{
         }
 
     private:
+        SuffixNode(const SuffixNode &nd);
+        SuffixNode &operator=(const SuffixNode nd);
+
         SubNotesT childNodes_;
         ParentNodeT *parentNode_;
         const MetaT &metaInfo_;
@@ -200,6 +248,21 @@ namespace suffix_tree_impl{
             optional_.resize(count, VALUE_MISSED);
         }
         ~LeafNode(){}
+
+        void copy(
+                const LeafNode &nd)
+        {
+            ValuesT tmp;
+            tmp.reserve(nd.values_.size());  
+            std::vector<char> tmpOptional(nd.optional_);
+            std::for_each(
+                std::begin(nd.values_), std::end(nd.values_), 
+                [&](const ValueT &val){
+                    tmp.push_back(val);
+                });
+            std::swap(tmp, values_);
+            std::swap(tmpOptional, optional_);
+        }
 
         const ValuesT &values()const{return values_;}
 
@@ -272,6 +335,9 @@ namespace suffix_tree_impl{
 
         const ParentNodeT *parent()const{return parentNode_;}
     private:
+        LeafNode(const LeafNode &nd);
+        LeafNode &operator=(const LeafNode nd);
+
         ParentNodeT *parentNode_;
         mutable ValuesT values_;
         std::vector<char> optional_;
@@ -402,6 +468,18 @@ public:
         clear();
     }
 
+    SuffixTree(
+            const SuffixTree &sft):
+        builder_(sft.builder_), root_(new suffix_tree_impl::RootNode<BuilderT>(*sft.root_)), size_(sft.size_)
+    {}
+
+    SuffixTree &operator=(
+            const SuffixTree sft)
+    {
+        std::swap(builder_, sft.builder_);
+        root_ = sft.root_;
+        size_ = sft.size_;
+    }
 
     Iterator begin()const
     {
@@ -520,10 +598,6 @@ private:
 
 
 private:
-    ///todo: implement copy operation
-    SuffixTree(const SuffixTree &);
-    SuffixTree &operator=(const SuffixTree &);
-
     BuilderT builder_;
     std::unique_ptr<RootNodeT> root_;
     size_t size_;
