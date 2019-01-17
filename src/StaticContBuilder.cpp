@@ -1,9 +1,9 @@
 #include "StdAfx.h"
-#include "ContBuilder.h"
+#include "StaticContBuilder.h"
 
 using namespace suffix_tree;
 
-ContBuilder::ContBuilder(
+StaticContBuilder::StaticContBuilder(
         const Key2IdxT &lvl1, 
         const Key2IdxT &lvl2, 
         const Key2IdxT &lvl3, 
@@ -21,21 +21,16 @@ ContBuilder::ContBuilder(
     std::sort(meta_[3].begin(), meta_[3].end());
 }
 
-ContBuilder::~ContBuilder()
+StaticContBuilder::~StaticContBuilder()
 {}
 
-size_t ContBuilder::levels()const
-{
-    return meta_.size();
-}
-
-size_t ContBuilder::suffixCount(
+size_t StaticContBuilder::suffixCount(
             SuffixLevel level)const
 {
     return meta_[level].size();
 }
 
-bool ContBuilder::getKeyIndex(
+bool StaticContBuilder::getKeyIndex(
             size_t level, 
             const KeyT &key, 
             size_t startIdx, 
@@ -58,9 +53,9 @@ bool ContBuilder::getKeyIndex(
     return true;
 }
 
-bool ContBuilder::parseKey(
+bool StaticContBuilder::parseKey(
             const KeyT &key, 
-            ContBuilder::ParsedKeyT &res)const
+            StaticContBuilder::ParsedKeyT &res)const
 {
     size_t currLevel = 0;
     size_t startIdx = 0;
@@ -83,7 +78,7 @@ bool ContBuilder::parseKey(
     }
     return true;
 }
-KeyT ContBuilder::assembleKey(
+KeyT StaticContBuilder::assembleKey(
             const ParsedKeyT &key)
 {
     KeyT resultKey;

@@ -45,7 +45,7 @@ namespace suffix_tree_impl{
                 [&](const ChildNodeT *val){
                     std::unique_ptr<ChildNodeT> chld;
                     if(nullptr != val){
-                        chld = std::unique_ptr<ChildNodeT>(new ChildNodeT(this, metaInfo_));
+                        chld = std::unique_ptr<ChildNodeT>(new ChildNodeT(this, tmp.size(), metaInfo_));
                         chld->copy(*val);
                     }
                     tmp.push_back(chld.get());
@@ -65,7 +65,7 @@ namespace suffix_tree_impl{
                 IndexT index)
         {
             if(nullptr == childNodes_[index])
-                childNodes_[index] = new ChildNodeT(this, metaInfo_);
+                childNodes_[index] = new ChildNodeT(this, index, metaInfo_);
             return childNodes_[index];
         }
 
@@ -125,8 +125,9 @@ namespace suffix_tree_impl{
     public:
         SuffixNode(
                 ParentNodeT *parentNode, 
+                IndexT index,
                 const MetaT &metaInfo): 
-            metaInfo_(metaInfo), parentNode_(parentNode)
+            metaInfo_(metaInfo), parentNode_(parentNode), selfIndex_(index)
         {
             childNodes_.assign(metaInfo_.suffixCount(NODE_LEVEL), nullptr);    
         }
@@ -145,20 +146,21 @@ namespace suffix_tree_impl{
                 [&](const ChildNodeT *val){
                     std::unique_ptr<ChildNodeT> chld;
                     if(nullptr != val){
-                        chld = std::unique_ptr<ChildNodeT>(new ChildNodeT(this, metaInfo_));
+                        chld = std::unique_ptr<ChildNodeT>(new ChildNodeT(this, tmp.size(), metaInfo_));
                         chld->copy(*val);
                     }
                     tmp.push_back(chld.get());
                     chld.release();
                 });
             std::swap(tmp, childNodes_);
+            selfIndex_ = nd.selfIndex_;
         }
 
         ChildNodeT *getChild(
                 IndexT index)
         {
             if(nullptr == childNodes_[index])
-                childNodes_[index] = new ChildNodeT(this, metaInfo_);
+                childNodes_[index] = new ChildNodeT(this, index, metaInfo_);
             return childNodes_[index];
         }
 
@@ -225,6 +227,7 @@ namespace suffix_tree_impl{
         SubNotesT childNodes_;
         ParentNodeT *parentNode_;
         const MetaT &metaInfo_;
+        IndexT selfIndex_;
     };
 
     template<typename MetaT, typename ValueT>
@@ -234,14 +237,16 @@ namespace suffix_tree_impl{
         typedef typename NodeTraitsT::ParentNodeT ParentNodeT;
         typedef std::vector<ValueT> ValuesT;
 
-        static const char VALUE_EXIST = 'Y';
-        static const char VALUE_MISSED = 'N';
+        static const bool VALUE_EXIST = true;
+        static const bool VALUE_MISSED = false;
+        typedef std::vector<bool> ValueOptionalT;
 
     public:
         LeafNode(
                 ParentNodeT *parentNode, 
+                IndexT index,
                 const MetaT &metaInfo): 
-            parentNode_(parentNode) 
+            parentNode_(parentNode), selfIndex_(index) 
         {
             size_t count = metaInfo.suffixCount(MetaT::leaf_Suffix);
             values_.resize(count, NodeTraitsT::defaultValue());
@@ -254,7 +259,7 @@ namespace suffix_tree_impl{
         {
             ValuesT tmp;
             tmp.reserve(nd.values_.size());  
-            std::vector<char> tmpOptional(nd.optional_);
+            ValueOptionalT tmpOptional(nd.optional_);
             std::for_each(
                 std::begin(nd.values_), std::end(nd.values_), 
                 [&](const ValueT &val){
@@ -262,6 +267,7 @@ namespace suffix_tree_impl{
                 });
             std::swap(tmp, values_);
             std::swap(tmpOptional, optional_);
+            selfIndex_ = nd.selfIndex_;
         }
 
         const ValuesT &values()const{return values_;}
@@ -340,7 +346,8 @@ namespace suffix_tree_impl{
 
         ParentNodeT *parentNode_;
         mutable ValuesT values_;
-        std::vector<char> optional_;
+        ValueOptionalT optional_;
+        IndexT selfIndex_;
     };
 
 }
@@ -548,6 +555,7 @@ public:
                     --size_;
                 return nextIt;
             };
+        ///todo: erase parent node, if last child node was erased
         return applyFunc(root_.get(), parsedKey, index, eraseFunc);
     }
 

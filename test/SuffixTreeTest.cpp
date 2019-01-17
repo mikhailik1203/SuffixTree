@@ -39,6 +39,65 @@ namespace{
         LARGE_INTEGER timerFreq_;
     };
 
+    struct ComplexKey{
+        size_t idx1_;
+        size_t idx2_;
+        size_t idx3_;
+        size_t idx4_;
+    };
+
+    bool operator < (const ComplexKey &l, const ComplexKey &v)
+    {
+        if(l.idx1_ == v.idx1_){
+            if(l.idx2_ == v.idx2_){
+                if(l.idx3_ == v.idx3_){
+                    return l.idx4_ < v.idx4_;                    
+                }else
+                    return l.idx3_ < v.idx3_;
+            }else
+                return l.idx2_ < v.idx2_;
+        }else
+            return l.idx1_ < v.idx1_;
+    }
+
+    template<typename ContT, typename KeyT, typename ValueT>
+    void perfTest(ContT &cont, 
+                  std::function<void(ContT &cont, const KeyT &, const ValueT &val)> insertAndCheckFunc, 
+                  std::function<void(ContT &cont)> postProcFunc, 
+                  const std::string &contName)
+    {
+        HighPerfTimer timer;
+        size_t memUsageBefore = processMemUsage();
+        timer.start();
+        char value[] = "aaa-bba-cca-dda";
+        int count = 1;
+        for(size_t i = 0; i < 26; ++i){
+            for(size_t j = 0; j < 26; ++j){
+                for(size_t k = 0; k < 26; ++k){
+                    for(size_t l = 0; l < 26; ++l){
+                        insertAndCheckFunc(cont, value, count);
+                        value[14] += 1;
+                        ++count;
+                    }
+                    value[10] += 1;
+                    value[14] = 'a';
+                }
+                value[6] += 1;
+                value[10] = 'a';
+                value[14] = 'a';
+            }
+            value[2] += 1;
+            value[6] = 'a';
+            value[10] = 'a';
+            value[14] = 'a';
+        }
+        timer.stop();
+        size_t memUsageAfter = processMemUsage();
+        std::cout<< "\tMemUsage for " << contName << " is [" << memUsageAfter - memUsageBefore << "] bytes" << std::endl;
+        std::cout<< "\tDuration of " << contName << " is [" << timer.interval()<< "]mksec" << std::endl;
+    }
+
+
 }
 
 namespace tst{
@@ -51,6 +110,7 @@ namespace tst{
             res.push_back(value);        
             value[2] += 1;
         }
+        std::sort(res.begin(), res.end());
         return res;
     }
 
@@ -62,6 +122,7 @@ namespace tst{
             res.push_back(value);        
             value[2] += 1;
         }
+        std::sort(res.begin(), res.end());
         return res;
     }
 
@@ -73,6 +134,7 @@ namespace tst{
             res.push_back(value);        
             value[2] += 1;
         }
+        std::sort(res.begin(), res.end());
         return res;
     }
 
@@ -84,6 +146,7 @@ namespace tst{
             res.push_back(value);        
             value[2] += 1;
         }
+        std::sort(res.begin(), res.end());
         return res;
     }
 
@@ -279,434 +342,224 @@ namespace tst{
         assert(99 == *cit);
     }
 
-    void fillContainerTest()
+    void perfSuffixTreeTest()
     {
-        HighPerfTimer timer;
+        size_t memUsageBeforeCreate = processMemUsage();
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
         size_t memUsageBefore = processMemUsage();
-        timer.start();
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
-        assert(0 == cont.size());
-        char value[] = "aaa-bba-cca-dda";
-        int count = 1;
-        for(size_t i = 0; i < 26; ++i){
-            for(size_t j = 0; j < 26; ++j){
-                for(size_t k = 0; k < 26; ++k){
-                    for(size_t l = 0; l < 26; ++l){
-                        auto it = cont.insert(value, count);
+        typedef suffix_tree::SuffixTree<ContBuilder, std::string, int> ContT;
+        ContT cont(builder);
+        size_t memUsageAfterCreate = processMemUsage();
+        std::cout<< "Performance of SuffixTree: "<< std::endl;
+        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
+                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
 
-                        assert(count == cont.size());
-                        assert(cont.end() != it);
-                        assert(count == *it);
+        perfTest<ContT, char *, int>(
+            cont, 
+            [](ContT &cont, const char *key, const int &value)->void
+            {
+                auto it = cont.insert(key, value);
 
-                        value[14] += 1;
-                        ++count;
-                    }
-                    value[10] += 1;
-                    value[14] = 'a';
-                }
-                value[6] += 1;
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-            value[2] += 1;
-            value[6] = 'a';
-            value[10] = 'a';
-            value[14] = 'a';
-        }
-        timer.stop();
-        size_t memUsageAfter = processMemUsage();
-        std::cout<< "MemUsage for SuffixTree is [" << memUsageAfter - memUsageBefore<< "], before [" << memUsageBefore << "], after [" << memUsageAfter << "]" << std::endl;
-        std::cout<< "\tDuration of insert into SuffixTree is [" << timer.interval()<< "]mksec" << std::endl;
+                assert(value == cont.size());
+                assert(cont.end() != it);
+                assert(value == *it);
+            }, 
+            [](ContT &cont){},
+            "inserts into");
 
-        {
-            size_t memUsageBefore = processMemUsage();
-            timer.start();
-
-            char value[] = "aaa-bba-cca-dda";
-            int count = 1;
-            for(size_t i = 0; i < 26; ++i){
-                for(size_t j = 0; j < 26; ++j){
-                    for(size_t k = 0; k < 26; ++k){
-                        for(size_t l = 0; l < 26; ++l){
-                            auto it = cont.find(value);
-                            assert(cont.end() != it);
-                            value[14] += 1;
-                        }
-                        value[10] += 1;
-                        value[14] = 'a';
-                    }
-                    value[6] += 1;
-                    value[10] = 'a';
-                    value[14] = 'a';
-                }
-                value[2] += 1;
-                value[6] = 'a';
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-
-            timer.stop();
-            size_t memUsageAfter = processMemUsage();
-            std::cout<< "\tSearch of all elements in SuffixTree is [" << timer.interval()<< "]mksec" << std::endl;
-        }
+        perfTest<ContT, char *, int>(
+            cont, 
+            [](ContT &cont, const char *key, const int &value)->void
+            {
+                auto it = cont.find(key);
+                assert(cont.end() != it);
+                assert(value == *it);
+            }, 
+            [](ContT &cont){},
+            "seq search");
     }
 
-    void fillStlMapContainerTest()
+    void perfStlMap_byString_Test()
     {
-        HighPerfTimer timer;
-        size_t memUsageBefore = processMemUsage();
-        timer.start();
-        std::map<std::string, int> cont;
-        assert(0 == cont.size());
-        char value[] = "aaa-bba-cca-dda";
-        int count = 1;
-        for(size_t i = 0; i < 26; ++i){
-            for(size_t j = 0; j < 26; ++j){
-                for(size_t k = 0; k < 26; ++k){
-                    for(size_t l = 0; l < 26; ++l){
-                        cont[value] = count;
+        size_t memUsageBeforeCreate = processMemUsage();
+        typedef std::map<std::string, int> ContT;
+        ContT cont;
+        size_t memUsageAfterCreate = processMemUsage();
+        std::cout<< "Performance of std::map: "<< std::endl;
+        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
+                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
 
-                        assert(count == cont.size());
+        perfTest<ContT, char *, int>(
+            cont, 
+            [](ContT &cont, const char *key, const int &value)->void
+            {
+                cont[key] = value;
 
-                        value[14] += 1;
-                        ++count;
-                    }
-                    value[10] += 1;
-                    value[14] = 'a';
-                }
-                value[6] += 1;
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-            value[2] += 1;
-            value[6] = 'a';
-            value[10] = 'a';
-            value[14] = 'a';
-        }
-        timer.stop();
-        size_t memUsageAfter = processMemUsage();
-        std::cout<< "MemUsage for std::map is [" << memUsageAfter - memUsageBefore<< "], before [" << memUsageBefore << "], after [" << memUsageAfter << "]" << std::endl;
-        std::cout<< "\tDuration of insert into std::map is [" << timer.interval()<< "]mksec" << std::endl;
+                assert(value == cont.size());
+            }, 
+            [](ContT &cont){},
+            "inserts into");
 
-        {
-            size_t memUsageBefore = processMemUsage();
-            timer.start();
-
-            char value[] = "aaa-bba-cca-dda";
-            int count = 1;
-            for(size_t i = 0; i < 26; ++i){
-                for(size_t j = 0; j < 26; ++j){
-                    for(size_t k = 0; k < 26; ++k){
-                        for(size_t l = 0; l < 26; ++l){
-                            auto it = cont.find(value);
-                            assert(cont.end() != it);
-                            value[14] += 1;
-                        }
-                        value[10] += 1;
-                        value[14] = 'a';
-                    }
-                    value[6] += 1;
-                    value[10] = 'a';
-                    value[14] = 'a';
-                }
-                value[2] += 1;
-                value[6] = 'a';
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-
-            timer.stop();
-            size_t memUsageAfter = processMemUsage();
-            std::cout<< "\tSearch of all elements in std::map is [" << timer.interval()<< "]mksec" << std::endl;
-        }
-
+        perfTest<ContT, char *, int>(
+            cont, 
+            [](ContT &cont, const char *key, const int &value)->void
+            {
+                auto it = cont.find(key);
+                assert(cont.end() != it);
+            }, 
+            [](ContT &cont){},
+            "seq search");
     }
 
-    struct ComplexKey{
-        size_t idx1_;
-        size_t idx2_;
-        size_t idx3_;
-        size_t idx4_;
-    };
-
-    bool operator < (const ComplexKey &l, const ComplexKey &v)
+    void perfStlMap_byStructKeyTest()
     {
-        if(l.idx1_ == v.idx1_){
-            if(l.idx2_ == v.idx2_){
-                if(l.idx3_ == v.idx3_){
-                    return l.idx4_ < v.idx4_;                    
-                }else
-                    return l.idx3_ < v.idx3_;
-            }else
-                return l.idx2_ < v.idx2_;
-        }else
-            return l.idx1_ < v.idx1_;
-    }
-
-
-    void fillStlComplexMapContainerTest()
-    {
-        ComplexKey complexKey;
+        size_t memUsageBeforeCreate = processMemUsage();
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
+        typedef std::map<ComplexKey, int> ContT;
+        ContT cont;
+        size_t memUsageAfterCreate = processMemUsage();
+        std::cout<< "Performance of std::map(struct key): "<< std::endl;
+        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
+                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
 
-        HighPerfTimer timer;
-        size_t memUsageBefore = processMemUsage();
-        timer.start();
-        std::map<ComplexKey, int> cont;
-        assert(0 == cont.size());
-        char value[] = "aaa-bba-cca-dda";
-        int count = 1;
-        for(size_t i = 0; i < 26; ++i){
-            for(size_t j = 0; j < 26; ++j){
-                for(size_t k = 0; k < 26; ++k){
-                    for(size_t l = 0; l < 26; ++l){
-                        ContBuilder::ParsedKeyT parsedKey;
-                        if(!builder.parseKey(value, parsedKey))
-                            throw std::runtime_error("Unable to parse string key to indexes");
-                        complexKey.idx1_ = parsedKey[0];
-                        complexKey.idx2_ = parsedKey[1];
-                        complexKey.idx3_ = parsedKey[2];
-                        complexKey.idx4_ = parsedKey[3];
-                        cont[complexKey] = count;
+        perfTest<ContT, char *, int>(
+            cont, 
+            [&builder](ContT &cont, const char *key, const int &value)->void
+            {
+                ComplexKey complexKey;
+                ContBuilder::ParsedKeyT parsedKey;
+                if(!builder.parseKey(key, parsedKey))
+                    throw std::runtime_error("Unable to parse string key to indexes");
+                complexKey.idx1_ = parsedKey[0];
+                complexKey.idx2_ = parsedKey[1];
+                complexKey.idx3_ = parsedKey[2];
+                complexKey.idx4_ = parsedKey[3];
+                cont[complexKey] = value;
 
-                        assert(count == cont.size());
+                assert(value == cont.size());
+            }, 
+            [](ContT &cont){},
+            "inserts into");
 
-                        value[14] += 1;
-                        ++count;
-                    }
-                    value[10] += 1;
-                    value[14] = 'a';
-                }
-                value[6] += 1;
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-            value[2] += 1;
-            value[6] = 'a';
-            value[10] = 'a';
-            value[14] = 'a';
-        }
-        timer.stop();
-        size_t memUsageAfter = processMemUsage();
-        std::cout<< "MemUsage for complex std::map is [" << memUsageAfter - memUsageBefore<< "], before [" << memUsageBefore << "], after [" << memUsageAfter << "]" << std::endl;
-        std::cout<< "\tDuration of insert into complex std::map is [" << timer.interval()<< "]mksec" << std::endl;
+        perfTest<ContT, char *, int>(
+            cont, 
+            [&builder](ContT &cont, const char *key, const int &)->void
+            {
+                ComplexKey complexKey;
+                ContBuilder::ParsedKeyT parsedKey;
+                if(!builder.parseKey(key, parsedKey))
+                    throw std::runtime_error("Unable to parse string key to indexes");
+                complexKey.idx1_ = parsedKey[0];
+                complexKey.idx2_ = parsedKey[1];
+                complexKey.idx3_ = parsedKey[2];
+                complexKey.idx4_ = parsedKey[3];
 
-        {
-            size_t memUsageBefore = processMemUsage();
-            timer.start();
-
-            char value[] = "aaa-bba-cca-dda";
-            int count = 1;
-            for(size_t i = 0; i < 26; ++i){
-                for(size_t j = 0; j < 26; ++j){
-                    for(size_t k = 0; k < 26; ++k){
-                        for(size_t l = 0; l < 26; ++l){
-                            ContBuilder::ParsedKeyT parsedKey;
-                            if(!builder.parseKey(value, parsedKey))
-                                throw std::runtime_error("Unable to parse string key to indexes");
-                            complexKey.idx1_ = parsedKey[0];
-                            complexKey.idx2_ = parsedKey[1];
-                            complexKey.idx3_ = parsedKey[2];
-                            complexKey.idx4_ = parsedKey[3];
-
-                            auto it = cont.find(complexKey);
-                            assert(cont.end() != it);
-                            value[14] += 1;
-                        }
-                        value[10] += 1;
-                        value[14] = 'a';
-                    }
-                    value[6] += 1;
-                    value[10] = 'a';
-                    value[14] = 'a';
-                }
-                value[2] += 1;
-                value[6] = 'a';
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-
-            timer.stop();
-            size_t memUsageAfter = processMemUsage();
-            std::cout<< "\tSearch of all elements in complex std::map is [" << timer.interval()<< "]mksec" << std::endl;
-        }
-
+                auto it = cont.find(complexKey);
+                assert(cont.end() != it);
+            }, 
+            [](ContT &cont){},
+            "seq search");
     }
 
-    void fillSortedStlVectorContainerTest()
+    void perfSortedStlVector_byStringTest()
     {
-        HighPerfTimer timer;
-        size_t memUsageBefore = processMemUsage();
-        timer.start();
+        size_t memUsageBeforeCreate = processMemUsage();
+
+        ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
         typedef std::pair<std::string, int> ValT;
-        std::vector<ValT> cont;
+        typedef std::vector<ValT> ContT;
+        ContT cont;
         cont.reserve(26*26*26*26);
-        assert(0 == cont.size());
-        char value[] = "aaa-bba-cca-dda";
-        int count = 1;
-        for(size_t i = 0; i < 26; ++i){
-            for(size_t j = 0; j < 26; ++j){
-                for(size_t k = 0; k < 26; ++k){
-                    for(size_t l = 0; l < 26; ++l){
-                        cont.push_back(ValT(value, count));
+        size_t memUsageAfterCreate = processMemUsage();
+        std::cout<< "Performance of sorted std::vector(string key): "<< std::endl;
+        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
+                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
 
-                        assert(count == cont.size());
+        perfTest<ContT, char *, int>(
+            cont, 
+            [&builder](ContT &cont, const char *key, const int &value)->void
+            {
+                cont.push_back(ValT(key, value));
+                assert(value == cont.size());
+            }, 
+            [](ContT &cont){
+                cont.shrink_to_fit();
+                std::sort(cont.begin(), cont.end(), [](const ValT &lft, const ValT &rght){ return lft.first < rght.first;});
+            },
+            "inserts into");
 
-                        value[14] += 1;
-                        ++count;
-                    }
-                    value[10] += 1;
-                    value[14] = 'a';
-                }
-                value[6] += 1;
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-            value[2] += 1;
-            value[6] = 'a';
-            value[10] = 'a';
-            value[14] = 'a';
-        }
-        cont.shrink_to_fit();
-        std::sort(cont.begin(), cont.end(), [](const ValT &lft, const ValT &rght){ return lft.first < rght.first;});
-        timer.stop();
-        size_t memUsageAfter = processMemUsage();
-        std::cout<< "MemUsage for sorted std::vector is [" << memUsageAfter - memUsageBefore<< "], before [" << memUsageBefore << "], after [" << memUsageAfter << "]" << std::endl;
-        std::cout<< "\tDuration of insert into sorted std::vector is [" << timer.interval()<< "]mksec" << std::endl;
-
-        {
-            size_t memUsageBefore = processMemUsage();
-            timer.start();
-
-            char value[] = "aaa-bba-cca-dda";
-            int count = 1;
-            for(size_t i = 0; i < 26; ++i){
-                for(size_t j = 0; j < 26; ++j){
-                    for(size_t k = 0; k < 26; ++k){
-                        for(size_t l = 0; l < 26; ++l){
-                            auto it = std::lower_bound(cont.begin(), cont.end(), ValT(value, 0), 
-                                [](const ValT &lft, const ValT &rght){return lft.first < rght.first;});
-                            assert(cont.end() != it);
-                            assert(value == it->first);
-                            value[14] += 1;
-                        }
-                        value[10] += 1;
-                        value[14] = 'a';
-                    }
-                    value[6] += 1;
-                    value[10] = 'a';
-                    value[14] = 'a';
-                }
-                value[2] += 1;
-                value[6] = 'a';
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-
-            timer.stop();
-            size_t memUsageAfter = processMemUsage();
-            std::cout<< "\tSearch of all elements in sorted std::vector is [" << timer.interval()<< "]mksec" << std::endl;
-        }
-
+        perfTest<ContT, char *, int>(
+            cont, 
+            [&builder](ContT &cont, const char *key, const int &)->void
+            {
+                auto it = std::lower_bound(cont.begin(), cont.end(), ValT(key, 0), 
+                    [](const ValT &lft, const ValT &rght){return lft.first < rght.first;});
+                assert(cont.end() != it);
+                assert(key == it->first);
+            }, 
+            [](ContT &cont){},
+            "seq search");
     }
 
-    void fillComplexSortedStlVectorContainerTest()
+    void perfSortedStlVector_byStructTest()
     {
-        ComplexKey complexKey;
+        size_t memUsageBeforeCreate = processMemUsage();
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-
-        HighPerfTimer timer;
-        size_t memUsageBefore = processMemUsage();
-        timer.start();
         typedef std::pair<ComplexKey, int> ValT;
-        std::vector<ValT> cont;
+        typedef std::vector<ValT> ContT;
+        ContT cont;
         cont.reserve(26*26*26*26);
-        assert(0 == cont.size());
-        char value[] = "aaa-bba-cca-dda";
-        int count = 1;
-        for(size_t i = 0; i < 26; ++i){
-            for(size_t j = 0; j < 26; ++j){
-                for(size_t k = 0; k < 26; ++k){
-                    for(size_t l = 0; l < 26; ++l){
-                        ContBuilder::ParsedKeyT parsedKey;
-                        if(!builder.parseKey(value, parsedKey))
-                            throw std::runtime_error("Unable to parse string key to indexes");
-                        complexKey.idx1_ = parsedKey[0];
-                        complexKey.idx2_ = parsedKey[1];
-                        complexKey.idx3_ = parsedKey[2];
-                        complexKey.idx4_ = parsedKey[3];
-                        cont.push_back(ValT(complexKey, count));
+        size_t memUsageAfterCreate = processMemUsage();
+        std::cout<< "Performance of soreted std::vector(struct key): "<< std::endl;
+        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
+                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
 
-                        assert(count == cont.size());
+        perfTest<ContT, char *, int>(
+            cont, 
+            [&builder](ContT &cont, const char *key, const int &value)->void
+            {
+                ComplexKey complexKey;
+                ContBuilder::ParsedKeyT parsedKey;
+                if(!builder.parseKey(key, parsedKey))
+                    throw std::runtime_error("Unable to parse string key to indexes");
+                complexKey.idx1_ = parsedKey[0];
+                complexKey.idx2_ = parsedKey[1];
+                complexKey.idx3_ = parsedKey[2];
+                complexKey.idx4_ = parsedKey[3];
+                cont.push_back(ValT(complexKey, value));
 
-                        value[14] += 1;
-                        ++count;
-                    }
-                    value[10] += 1;
-                    value[14] = 'a';
-                }
-                value[6] += 1;
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-            value[2] += 1;
-            value[6] = 'a';
-            value[10] = 'a';
-            value[14] = 'a';
-        }
-        cont.shrink_to_fit();
-        std::sort(cont.begin(), cont.end(), [](const ValT &lft, const ValT &rght){ return lft.first < rght.first;});
-        timer.stop();
-        size_t memUsageAfter = processMemUsage();
-        std::cout<< "MemUsage for complex sorted std::vector is [" << memUsageAfter - memUsageBefore<< "], before [" << memUsageBefore << "], after [" << memUsageAfter << "]" << std::endl;
-        std::cout<< "\tDuration of insert into complex sorted std::vector is [" << timer.interval()<< "]mksec" << std::endl;
+                assert(value == cont.size());
+            }, 
+            [](ContT &cont)
+            {
+                cont.shrink_to_fit();
+                std::sort(cont.begin(), cont.end(), [](const ValT &lft, const ValT &rght){ return lft.first < rght.first;});
+            },
+            "inserts into");
 
-        {
-            size_t memUsageBefore = processMemUsage();
-            timer.start();
+        perfTest<ContT, char *, int>(
+            cont, 
+            [&builder](ContT &cont, const char *key, const int &)->void
+            {
+                ComplexKey complexKey;
+                ContBuilder::ParsedKeyT parsedKey;
+                if(!builder.parseKey(key, parsedKey))
+                    throw std::runtime_error("Unable to parse string key to indexes");
+                complexKey.idx1_ = parsedKey[0];
+                complexKey.idx2_ = parsedKey[1];
+                complexKey.idx3_ = parsedKey[2];
+                complexKey.idx4_ = parsedKey[3];
 
-            char value[] = "aaa-bba-cca-dda";
-            int count = 1;
-            for(size_t i = 0; i < 26; ++i){
-                for(size_t j = 0; j < 26; ++j){
-                    for(size_t k = 0; k < 26; ++k){
-                        for(size_t l = 0; l < 26; ++l){
-                            ContBuilder::ParsedKeyT parsedKey;
-                            if(!builder.parseKey(value, parsedKey))
-                                throw std::runtime_error("Unable to parse string key to indexes");
-                            complexKey.idx1_ = parsedKey[0];
-                            complexKey.idx2_ = parsedKey[1];
-                            complexKey.idx3_ = parsedKey[2];
-                            complexKey.idx4_ = parsedKey[3];
-
-                            auto it = std::lower_bound(cont.begin(), cont.end(), ValT(complexKey, 0), 
-                                [](const ValT &lft, const ValT &rght){return lft.first < rght.first;});
-                            assert(cont.end() != it);
-                            assert(complexKey.idx1_ == it->first.idx1_);
-                            assert(complexKey.idx2_ == it->first.idx2_);
-                            assert(complexKey.idx3_ == it->first.idx3_);
-                            assert(complexKey.idx4_ == it->first.idx4_);
-                            value[14] += 1;
-                        }
-                        value[10] += 1;
-                        value[14] = 'a';
-                    }
-                    value[6] += 1;
-                    value[10] = 'a';
-                    value[14] = 'a';
-                }
-                value[2] += 1;
-                value[6] = 'a';
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-
-            timer.stop();
-            size_t memUsageAfter = processMemUsage();
-            std::cout<< "\tSearch of all elements in complex sorted std::vector is [" << timer.interval()<< "]mksec" << std::endl;
-        }
-
+                auto it = std::lower_bound(cont.begin(), cont.end(), ValT(complexKey, 0), 
+                    [](const ValT &lft, const ValT &rght){return lft.first < rght.first;});
+                assert(cont.end() != it);
+                assert(complexKey.idx1_ == it->first.idx1_);
+                assert(complexKey.idx2_ == it->first.idx2_);
+                assert(complexKey.idx3_ == it->first.idx3_);
+                assert(complexKey.idx4_ == it->first.idx4_);
+            }, 
+            [](ContT &cont){},
+            "seq search");
     }
 
 
@@ -722,11 +575,12 @@ namespace tst{
         setByIteratorTest();
         copyEmptyContainerTest();
         copyContainerTest();
-        fillContainerTest();
-        fillStlMapContainerTest();
-        fillStlComplexMapContainerTest();
-        fillSortedStlVectorContainerTest();
-        fillComplexSortedStlVectorContainerTest();
+
+        perfSuffixTreeTest();
+        perfStlMap_byString_Test();
+        perfStlMap_byStructKeyTest();
+        perfSortedStlVector_byStringTest();
+        perfSortedStlVector_byStructTest();
     }
 
 }
