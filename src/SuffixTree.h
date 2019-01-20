@@ -64,6 +64,8 @@ namespace suffix_tree_impl{
         ChildNodeT *getChild(
                 IndexT index)
         {
+            if(childNodes_.size() <= index)
+                childNodes_.resize(index + 1, nullptr);
             if(nullptr == childNodes_[index])
                 childNodes_[index] = new ChildNodeT(this, index, metaInfo_);
             return childNodes_[index];
@@ -72,11 +74,13 @@ namespace suffix_tree_impl{
         ChildNodeT *findChild(
                 IndexT index)
         {
+            if(childNodes_.size() <= index)
+                return nullptr;
             return childNodes_[index];
         }
 
         IndexT next(
-                IndexT index)
+                IndexT index)const
         {
             for(size_t i = index + 1; i != childNodes_.size(); ++i)
             {
@@ -84,6 +88,16 @@ namespace suffix_tree_impl{
                     return i;
             }
             return INVALID_INDEX;
+        }
+
+        const ChildNodeT *begin()const
+        {
+            for(size_t i = 0; i != childNodes_.size(); ++i)
+            {
+                if(nullptr != childNodes_[i])
+                    return childNodes_[i];
+            }
+            return nullptr;
         }
 
         const ChildNodeT *nextNode(
@@ -104,10 +118,11 @@ namespace suffix_tree_impl{
 
         void clear()
         {
-            std::for_each(std::begin(childNodes_), std::end(childNodes_), 
+            SubNotesT tmp(metaInfo_.suffixCount(NODE_LEVEL), nullptr);
+            std::swap(tmp, childNodes_);
+
+            std::for_each(std::begin(tmp), std::end(tmp), 
                 [](ChildNodeT *val){delete val;});
-            childNodes_.clear();
-            childNodes_.assign(metaInfo_.suffixCount(NODE_LEVEL), nullptr);
         }
 
     private:
@@ -159,6 +174,9 @@ namespace suffix_tree_impl{
         ChildNodeT *getChild(
                 IndexT index)
         {
+            if(childNodes_.size() <= index)
+                childNodes_.resize(index + 1, nullptr);
+
             if(nullptr == childNodes_[index])
                 childNodes_[index] = new ChildNodeT(this, index, metaInfo_);
             return childNodes_[index];
@@ -167,6 +185,9 @@ namespace suffix_tree_impl{
         ChildNodeT *findChild(
                 IndexT index)const
         {
+            if(childNodes_.size() < index)
+                return nullptr;
+
             return childNodes_[index];
         }
 
@@ -213,11 +234,11 @@ namespace suffix_tree_impl{
 
         void clear()
         {
+            SubNotesT tmp(metaInfo_.suffixCount(NODE_LEVEL), nullptr);
+            std::swap(tmp, childNodes_);
             std::for_each(
-                std::begin(childNodes_), std::end(childNodes_), 
+                std::begin(tmp), std::end(tmp), 
                 [](ChildNodeT *val){delete val;});
-            childNodes_.clear();
-            childNodes_.assign(metaInfo_.suffixCount(NODE_LEVEL), nullptr);    
         }
 
     private:
@@ -276,6 +297,11 @@ namespace suffix_tree_impl{
                 IndexT index, 
                 const ValueT &val)
         {
+            if(values_.size() <= index){
+                values_.resize(index + 1, NodeTraitsT::defaultValue());
+                optional_.resize(index + 1, false);
+            }
+
             values_[index] = val;
             if(VALUE_EXIST == optional_[index])
                 return false;
@@ -286,7 +312,7 @@ namespace suffix_tree_impl{
         ValueT &get(
                 IndexT index)const
         {
-            if(VALUE_MISSED == optional_[index])
+            if((values_.size() <= index) || (VALUE_MISSED == optional_[index]))
                 throw std::runtime_error("LeafNode::get: element is not exist at index");
             return values_[index];
         }
@@ -294,13 +320,13 @@ namespace suffix_tree_impl{
         bool exist(
                 IndexT index)const
         {
-            return (VALUE_EXIST == optional_[index]);
+            return (optional_.size() > index) && (VALUE_EXIST == optional_[index]);
         }
 
         bool erase(
                 IndexT index)
         {
-            if(VALUE_MISSED == optional_[index])
+            if ((optional_.size() <= index) || (VALUE_MISSED == optional_[index]))
                 return false;
             values_[index] = NodeTraitsT::defaultValue();
             optional_[index] = VALUE_MISSED;
@@ -462,12 +488,15 @@ public:
     typedef typename SuffixTreeIterator<ThisTypeT> Iterator;
     typedef typename ContBuilderT::NodeTraits<ContBuilderT::leaf_Suffix>::NodeTypeT LeafNodeT;
     typedef std::function<Iterator(LeafNodeT *node)> NodeFunctorT;
+    typedef std::function<Iterator(const LeafNodeT *node)> CNodeFunctorT;
     typedef suffix_tree_impl::RootNode<BuilderT> RootNodeT;
 
 public:
     SuffixTree(
             const BuilderT &builder):
-        builder_(builder), root_(new suffix_tree_impl::RootNode<BuilderT>(builder)), size_(0)
+        builder_(builder), 
+        root_(new suffix_tree_impl::RootNode<BuilderT>(builder)), 
+        size_(0)
     {}
 
     ~SuffixTree()
@@ -477,7 +506,9 @@ public:
 
     SuffixTree(
             const SuffixTree &sft):
-        builder_(sft.builder_), root_(new suffix_tree_impl::RootNode<BuilderT>(*sft.root_)), size_(sft.size_)
+        builder_(sft.builder_), 
+        root_(new suffix_tree_impl::RootNode<BuilderT>(*sft.root_)), 
+        size_(sft.size_)
     {}
 
     SuffixTree &operator=(
@@ -490,14 +521,15 @@ public:
 
     Iterator begin()const
     {
-        ///todo: fix it
-        SuffixL2Node *node = root_->getChild(0);
-        if(nullptr == node)
-            return end();
-        LeafNode *node2 = node->getChild(0);
-        if(nullptr == node2)
-            return end();
-        return Iterator(node2, 0);
+        auto findFunc = [&, this](const LeafNodeT *node)->ThisTypeT::Iterator
+            {
+                suffix_tree_impl::IndexT idx = node->begin();
+                if(suffix_tree_impl::INVALID_INDEX == idx)
+                    return end();
+                return SuffixTree<ContBuilderT, KeyT, ContValueT>::Iterator(node, idx);
+            };
+
+        return applyFunc(root_.get(), findFunc);
     }
 
     Iterator end()const
@@ -510,7 +542,7 @@ public:
             const ValueT &val)
     {
         ContBuilderT::ParsedKeyT parsedKey;
-        if(!builder_.parseKey(key, parsedKey))
+        if(!builder_.parseNewKey(key, parsedKey))
             return end();
         size_t index = 0;
 
@@ -604,6 +636,28 @@ private:
         return func(childNode);
     }
 
+
+    template<typename NodeT>
+    Iterator applyFunc(
+                const NodeT *node, 
+                CNodeFunctorT func)const
+    {
+        auto *childNode = node->begin();
+        if(nullptr == childNode)
+            return end();
+        return applyFunc(childNode, func);
+    }
+
+    Iterator applyFunc(
+                const suffix_tree_impl::SuffixNode<typename ContBuilderT, 
+                        static_cast<typename ContBuilderT::SuffixLevel>(ContBuilderT::leaf_Suffix - 1)> *node, 
+                CNodeFunctorT func)const
+    {
+        const auto *childNode = node->begin();
+        if(nullptr == childNode)
+            return end();
+        return func(childNode);
+    }
 
 private:
     BuilderT builder_;

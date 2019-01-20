@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "StaticSuffixTree.h"
 #include "StaticContBuilder.h"
+#include "MemAllocHook.h"
 #include <cassert>
 #include <iostream>
 #include <functional>
@@ -9,76 +10,6 @@
 
 
 namespace{
-    size_t processMemUsage()
-    {
-        PROCESS_MEMORY_COUNTERS memusage;
-        GetProcessMemoryInfo(GetCurrentProcess(), &memusage, sizeof(memusage));        
-        return memusage.WorkingSetSize;
-    }
-
-    class HighPerfTimer{
-    public:
-        HighPerfTimer()
-        {
-            QueryPerformanceFrequency(&timerFreq_); 
-        }
-
-        void start()
-        {
-            QueryPerformanceCounter(&startTime_);
-        }
-        void stop()
-        {
-            QueryPerformanceCounter(&finishTime_);
-        }
-
-        double interval()const
-        {
-            return (finishTime_.QuadPart - startTime_.QuadPart)*1000000/timerFreq_.QuadPart;
-        }
-    private:
-        LARGE_INTEGER startTime_, finishTime_;
-        LARGE_INTEGER timerFreq_;
-    };
-
-
-    template<typename ContT, typename KeyT, typename ValueT>
-    void perfTest(ContT &cont, std::function<void(ContT &cont, const KeyT &, const ValueT &val)> insertAndCheckFunc, const std::string &contName)
-    {
-        HighPerfTimer timer;
-        size_t memUsageBefore = processMemUsage();
-        timer.start();
-        char value[] = "aaa-bba-cca-dda";
-        int count = 1;
-        for(size_t i = 0; i < 26; ++i){
-            for(size_t j = 0; j < 26; ++j){
-                for(size_t k = 0; k < 26; ++k){
-                    for(size_t l = 0; l < 26; ++l){
-                        insertAndCheckFunc(cont, value, count);
-                        value[14] += 1;
-                        ++count;
-                    }
-                    value[10] += 1;
-                    value[14] = 'a';
-                }
-                value[6] += 1;
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-            value[2] += 1;
-            value[6] = 'a';
-            value[10] = 'a';
-            value[14] = 'a';
-        }
-        timer.stop();
-        size_t memUsageAfter = processMemUsage();
-        std::cout<< "\tMemUsage for " << contName << " is [" << memUsageAfter - memUsageBefore << "] bytes" << std::endl;
-        std::cout<< "\tDuration of " << contName << " is [" << timer.interval()<< "]mksec" << std::endl;
-    }
-}
-
-namespace st_tst{
-
     Key2IdxT prepareLevel1Keys()
     {
         Key2IdxT res;
@@ -126,6 +57,11 @@ namespace st_tst{
         std::sort(res.begin(), res.end());
         return res;
     }
+
+}
+
+namespace st_tst{
+
 
     void vanillaTest()
     {
@@ -319,42 +255,6 @@ namespace st_tst{
         assert(99 == *cit);
     }
 
-    void fillContainerTest()
-    {
-        size_t memUsageBeforeCreate = processMemUsage();
-        StaticContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        typedef int ValueT;
-        typedef st_suffix_tree::StaticSuffixTree<StaticContBuilder, std::string, ValueT> ContT;
-        ContT cont(builder);
-        size_t memUsageAfterCreate = processMemUsage();
-        std::cout<< "Performance of StaticSuffixTree: "<< std::endl;
-        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
-                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [](ContT &cont, const char *key, const int &value)->void
-            {
-                auto it = cont.insert(key, value);
-
-                assert(value == cont.size());
-                assert(cont.end() != it);
-                assert(value == *it);
-            }, 
-            "inserts into");
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [](ContT &cont, const char *key, const int &value)->void
-            {
-                auto it = cont.find(key);
-                assert(cont.end() != it);
-                assert(value == *it);
-            }, 
-            "seq search");
-    }
-
-
 
     void staticContainerTestSuite()
     {
@@ -368,7 +268,6 @@ namespace st_tst{
         setByIteratorTest();
         copyEmptyContainerTest();
         copyContainerTest();
-        fillContainerTest();
     }
 
 }

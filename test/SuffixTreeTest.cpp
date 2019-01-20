@@ -1,43 +1,16 @@
 #include "stdafx.h"
 #include "SuffixTree.h"
 #include "ContBuilder.h"
+#include "MemAllocHook.h"
 #include <cassert>
 #include <iostream>
 #include <map>
-
+#include <iomanip>
+#include <string>
 
 namespace{
-    size_t processMemUsage()
-    {
-        PROCESS_MEMORY_COUNTERS memusage;
-        GetProcessMemoryInfo(GetCurrentProcess(), &memusage, sizeof(memusage));        
-        return memusage.WorkingSetSize;
-    }
-
-    class HighPerfTimer{
-    public:
-        HighPerfTimer()
-        {
-            QueryPerformanceFrequency(&timerFreq_); 
-        }
-
-        void start()
-        {
-            QueryPerformanceCounter(&startTime_);
-        }
-        void stop()
-        {
-            QueryPerformanceCounter(&finishTime_);
-        }
-
-        double interval()const
-        {
-            return (finishTime_.QuadPart - startTime_.QuadPart)*1000000/timerFreq_.QuadPart;
-        }
-    private:
-        LARGE_INTEGER startTime_, finishTime_;
-        LARGE_INTEGER timerFreq_;
-    };
+    typedef std::vector<std::string> GeneratedKeyT;
+    typedef std::vector<double> DurationsT;
 
     struct ComplexKey{
         size_t idx1_;
@@ -66,8 +39,8 @@ namespace{
                   std::function<void(ContT &cont)> postProcFunc, 
                   const std::string &contName)
     {
-        HighPerfTimer timer;
-        size_t memUsageBefore = processMemUsage();
+        hptimer::HighPerfTimer timer;
+        size_t memUsageBefore = mem_alloc::processMemUsage();
         timer.start();
         char value[] = "aaa-bba-cca-dda";
         int count = 1;
@@ -91,16 +64,12 @@ namespace{
             value[10] = 'a';
             value[14] = 'a';
         }
+        postProcFunc(cont);
         timer.stop();
-        size_t memUsageAfter = processMemUsage();
+        size_t memUsageAfter = mem_alloc::processMemUsage();
         std::cout<< "\tMemUsage for " << contName << " is [" << memUsageAfter - memUsageBefore << "] bytes" << std::endl;
-        std::cout<< "\tDuration of " << contName << " is [" << timer.interval()<< "]mksec" << std::endl;
+        std::cout<< "\tDuration of " << contName << " is [" << std::setprecision(12)<< timer.interval()<< "]nsec" << std::endl;
     }
-
-
-}
-
-namespace tst{
 
     Key2IdxT prepareLevel1Keys()
     {
@@ -150,6 +119,71 @@ namespace tst{
         return res;
     }
 
+    GeneratedKeyT generateKeys()
+    {
+        std::vector<std::string> res;
+        res.reserve(26*26*26*26);
+        char value[] = "aaa-bba-cca-dda";
+        int count = 1;
+        for(size_t i = 0; i < 26; ++i){
+            for(size_t j = 0; j < 26; ++j){
+                for(size_t k = 0; k < 26; ++k){
+                    for(size_t l = 0; l < 26; ++l){
+                        res.push_back(value);
+                        value[14] += 1;
+                        ++count;
+                    }
+                    value[10] += 1;
+                    value[14] = 'a';
+                }
+                value[6] += 1;
+                value[10] = 'a';
+                value[14] = 'a';
+            }
+            value[2] += 1;
+            value[6] = 'a';
+            value[10] = 'a';
+            value[14] = 'a';
+        }
+        return res;
+    }
+
+    typedef std::pair<double, double> MinMaxPairT;
+
+    template<typename ContT, typename KeyT, typename ValueT>
+    MinMaxPairT latencyTest(
+                  ContT &cont, 
+                  const GeneratedKeyT &keys,
+                  size_t batchSize,
+                  std::function<void(ContT &, const KeyT &, const ValueT &)> insertAndCheckFunc, 
+                  std::function<void(ContT &)> postProcFunc, 
+                  const std::string &contName)
+    {
+        size_t count = keys.size();
+        DurationsT dur(count, 0.0);
+        hptimer::HighPerfTimer timer;
+        double minL = 1000000000, maxL = 0;
+        size_t i = 0;
+        while(i < count){
+            timer.start();
+            for(size_t j = 0; j < batchSize; ++j){
+                insertAndCheckFunc(cont, keys[i + j], static_cast<int>(count));
+            }
+            timer.stop();
+            double v = timer.interval();
+            dur[i] = v;
+            minL = std::min(minL, v);
+            maxL = std::max(maxL, v);
+            i += batchSize;
+        }
+        return MinMaxPairT(minL, maxL);
+    }
+
+}
+
+namespace tst{
+
+
     void vanillaTest()
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
@@ -167,10 +201,12 @@ namespace tst{
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
         suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
         assert(0 == cont.size());
-        auto it = cont.insert("aaa-bbb-XXX-dda", 777);
+        /// key with 3 subkeys, while 4 subkeys are expected
+        auto it = cont.insert("aaa-bbb-dda", 777);
         assert(0 == cont.size());
         assert(cont.end() == it);
-        assert(cont.end() == cont.find("aaa-bbb-XXX-dda"));
+        assert(cont.end() == cont.find("aaa-bbb-dda"));
+        assert(cont.end() == cont.erase("aaa-bbb-dda"));
     }
 
     void findNonexistTest()
@@ -284,6 +320,32 @@ namespace tst{
         assert(7778 == *it1);
     }
 
+    void beginIteratorTest()
+    {
+        ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
+        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        assert(0 == cont.size());
+        auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
+        assert(1 == cont.size());
+        assert(cont.end() != it);
+        assert(777 == it.value());
+
+        auto it2 = cont.insert("aaa-bba-cca-dda", 333);
+        assert(2 == cont.size());
+        assert(cont.end() != it2);
+        assert(333 == it2.value());
+
+        auto it3 = cont.insert("aaz-bbz-ccz-ddz", 999);
+        assert(3 == cont.size());
+        assert(cont.end() != it3);
+        assert(999 == it3.value());
+
+        auto itBegin = cont.begin();
+        assert(3 == cont.size());
+        assert(cont.end() != itBegin);
+        assert(333 == itBegin.value());
+    }
+
     void copyEmptyContainerTest()
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
@@ -342,226 +404,17 @@ namespace tst{
         assert(99 == *cit);
     }
 
-    void perfSuffixTreeTest()
+    void addNewKeyTest()
     {
-        size_t memUsageBeforeCreate = processMemUsage();
-        ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        size_t memUsageBefore = processMemUsage();
-        typedef suffix_tree::SuffixTree<ContBuilder, std::string, int> ContT;
-        ContT cont(builder);
-        size_t memUsageAfterCreate = processMemUsage();
-        std::cout<< "Performance of SuffixTree: "<< std::endl;
-        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
-                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [](ContT &cont, const char *key, const int &value)->void
-            {
-                auto it = cont.insert(key, value);
-
-                assert(value == cont.size());
-                assert(cont.end() != it);
-                assert(value == *it);
-            }, 
-            [](ContT &cont){},
-            "inserts into");
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [](ContT &cont, const char *key, const int &value)->void
-            {
-                auto it = cont.find(key);
-                assert(cont.end() != it);
-                assert(value == *it);
-            }, 
-            [](ContT &cont){},
-            "seq search");
+        ContBuilder builder;
+        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        assert(0 == cont.size());
+        auto it = cont.insert("new-sub-key-test", 1234);
+        assert(1 == cont.size());
+        assert(cont.end() != it);
+        assert(cont.end() != cont.find("new-sub-key-test"));
+        assert(cont.end() == cont.find("aaa-bbb-cca-ddd"));
     }
-
-    void perfStlMap_byString_Test()
-    {
-        size_t memUsageBeforeCreate = processMemUsage();
-        typedef std::map<std::string, int> ContT;
-        ContT cont;
-        size_t memUsageAfterCreate = processMemUsage();
-        std::cout<< "Performance of std::map: "<< std::endl;
-        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
-                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [](ContT &cont, const char *key, const int &value)->void
-            {
-                cont[key] = value;
-
-                assert(value == cont.size());
-            }, 
-            [](ContT &cont){},
-            "inserts into");
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [](ContT &cont, const char *key, const int &value)->void
-            {
-                auto it = cont.find(key);
-                assert(cont.end() != it);
-            }, 
-            [](ContT &cont){},
-            "seq search");
-    }
-
-    void perfStlMap_byStructKeyTest()
-    {
-        size_t memUsageBeforeCreate = processMemUsage();
-        ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        typedef std::map<ComplexKey, int> ContT;
-        ContT cont;
-        size_t memUsageAfterCreate = processMemUsage();
-        std::cout<< "Performance of std::map(struct key): "<< std::endl;
-        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
-                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [&builder](ContT &cont, const char *key, const int &value)->void
-            {
-                ComplexKey complexKey;
-                ContBuilder::ParsedKeyT parsedKey;
-                if(!builder.parseKey(key, parsedKey))
-                    throw std::runtime_error("Unable to parse string key to indexes");
-                complexKey.idx1_ = parsedKey[0];
-                complexKey.idx2_ = parsedKey[1];
-                complexKey.idx3_ = parsedKey[2];
-                complexKey.idx4_ = parsedKey[3];
-                cont[complexKey] = value;
-
-                assert(value == cont.size());
-            }, 
-            [](ContT &cont){},
-            "inserts into");
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [&builder](ContT &cont, const char *key, const int &)->void
-            {
-                ComplexKey complexKey;
-                ContBuilder::ParsedKeyT parsedKey;
-                if(!builder.parseKey(key, parsedKey))
-                    throw std::runtime_error("Unable to parse string key to indexes");
-                complexKey.idx1_ = parsedKey[0];
-                complexKey.idx2_ = parsedKey[1];
-                complexKey.idx3_ = parsedKey[2];
-                complexKey.idx4_ = parsedKey[3];
-
-                auto it = cont.find(complexKey);
-                assert(cont.end() != it);
-            }, 
-            [](ContT &cont){},
-            "seq search");
-    }
-
-    void perfSortedStlVector_byStringTest()
-    {
-        size_t memUsageBeforeCreate = processMemUsage();
-
-        ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        typedef std::pair<std::string, int> ValT;
-        typedef std::vector<ValT> ContT;
-        ContT cont;
-        cont.reserve(26*26*26*26);
-        size_t memUsageAfterCreate = processMemUsage();
-        std::cout<< "Performance of sorted std::vector(string key): "<< std::endl;
-        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
-                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [&builder](ContT &cont, const char *key, const int &value)->void
-            {
-                cont.push_back(ValT(key, value));
-                assert(value == cont.size());
-            }, 
-            [](ContT &cont){
-                cont.shrink_to_fit();
-                std::sort(cont.begin(), cont.end(), [](const ValT &lft, const ValT &rght){ return lft.first < rght.first;});
-            },
-            "inserts into");
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [&builder](ContT &cont, const char *key, const int &)->void
-            {
-                auto it = std::lower_bound(cont.begin(), cont.end(), ValT(key, 0), 
-                    [](const ValT &lft, const ValT &rght){return lft.first < rght.first;});
-                assert(cont.end() != it);
-                assert(key == it->first);
-            }, 
-            [](ContT &cont){},
-            "seq search");
-    }
-
-    void perfSortedStlVector_byStructTest()
-    {
-        size_t memUsageBeforeCreate = processMemUsage();
-        ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        typedef std::pair<ComplexKey, int> ValT;
-        typedef std::vector<ValT> ContT;
-        ContT cont;
-        cont.reserve(26*26*26*26);
-        size_t memUsageAfterCreate = processMemUsage();
-        std::cout<< "Performance of soreted std::vector(struct key): "<< std::endl;
-        std::cout<< "\tMemUsage for creation is [" << memUsageAfterCreate - memUsageBeforeCreate
-                 << "]bytes, before [" << memUsageBeforeCreate << "], after [" << memUsageAfterCreate << "]" << std::endl;
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [&builder](ContT &cont, const char *key, const int &value)->void
-            {
-                ComplexKey complexKey;
-                ContBuilder::ParsedKeyT parsedKey;
-                if(!builder.parseKey(key, parsedKey))
-                    throw std::runtime_error("Unable to parse string key to indexes");
-                complexKey.idx1_ = parsedKey[0];
-                complexKey.idx2_ = parsedKey[1];
-                complexKey.idx3_ = parsedKey[2];
-                complexKey.idx4_ = parsedKey[3];
-                cont.push_back(ValT(complexKey, value));
-
-                assert(value == cont.size());
-            }, 
-            [](ContT &cont)
-            {
-                cont.shrink_to_fit();
-                std::sort(cont.begin(), cont.end(), [](const ValT &lft, const ValT &rght){ return lft.first < rght.first;});
-            },
-            "inserts into");
-
-        perfTest<ContT, char *, int>(
-            cont, 
-            [&builder](ContT &cont, const char *key, const int &)->void
-            {
-                ComplexKey complexKey;
-                ContBuilder::ParsedKeyT parsedKey;
-                if(!builder.parseKey(key, parsedKey))
-                    throw std::runtime_error("Unable to parse string key to indexes");
-                complexKey.idx1_ = parsedKey[0];
-                complexKey.idx2_ = parsedKey[1];
-                complexKey.idx3_ = parsedKey[2];
-                complexKey.idx4_ = parsedKey[3];
-
-                auto it = std::lower_bound(cont.begin(), cont.end(), ValT(complexKey, 0), 
-                    [](const ValT &lft, const ValT &rght){return lft.first < rght.first;});
-                assert(cont.end() != it);
-                assert(complexKey.idx1_ == it->first.idx1_);
-                assert(complexKey.idx2_ == it->first.idx2_);
-                assert(complexKey.idx3_ == it->first.idx3_);
-                assert(complexKey.idx4_ == it->first.idx4_);
-            }, 
-            [](ContT &cont){},
-            "seq search");
-    }
-
 
     void containerTestSuite()
     {
@@ -572,15 +425,12 @@ namespace tst{
         eraseByKeyTest();
         eraseAgainByKeyTest();
         eraseByIteratorTest();
+        beginIteratorTest();
         setByIteratorTest();
         copyEmptyContainerTest();
         copyContainerTest();
-
-        perfSuffixTreeTest();
-        perfStlMap_byString_Test();
-        perfStlMap_byStructKeyTest();
-        perfSortedStlVector_byStringTest();
-        perfSortedStlVector_byStructTest();
+        addNewKeyTest();
     }
 
 }
+
