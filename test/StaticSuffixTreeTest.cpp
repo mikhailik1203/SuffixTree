@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "StaticSuffixTree.h"
 #include "StaticContBuilder.h"
 #include "MemAllocHook.h"

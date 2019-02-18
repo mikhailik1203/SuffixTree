@@ -1,6 +1,6 @@
-#include "stdafx.h"
 #include "SuffixTree.h"
 #include "ContBuilder.h"
+#include "hpUtils.h"
 #include "MemAllocHook.h"
 #include <cassert>
 #include <iostream>
@@ -116,35 +116,6 @@ namespace{
             value[2] += 1;
         }
         std::sort(res.begin(), res.end());
-        return res;
-    }
-
-    GeneratedKeyT generateKeys()
-    {
-        std::vector<std::string> res;
-        res.reserve(26*26*26*26);
-        char value[] = "aaa-bba-cca-dda";
-        int count = 1;
-        for(size_t i = 0; i < 26; ++i){
-            for(size_t j = 0; j < 26; ++j){
-                for(size_t k = 0; k < 26; ++k){
-                    for(size_t l = 0; l < 26; ++l){
-                        res.push_back(value);
-                        value[14] += 1;
-                        ++count;
-                    }
-                    value[10] += 1;
-                    value[14] = 'a';
-                }
-                value[6] += 1;
-                value[10] = 'a';
-                value[14] = 'a';
-            }
-            value[2] += 1;
-            value[6] = 'a';
-            value[10] = 'a';
-            value[14] = 'a';
-        }
         return res;
     }
 

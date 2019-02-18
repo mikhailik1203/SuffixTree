@@ -2,12 +2,12 @@
 
 #include <vector>
 #include <string>
-#include <hash_map>
+#include <unordered_map>
 #include "SuffixTree.h"
 
 typedef std::string KeyT;
 typedef std::vector<KeyT> Key2IdxT;
-typedef std::hash_map<KeyT, size_t> Key2IndexT;
+typedef std::unordered_map<KeyT, size_t> Key2IndexT;
 
 class ContBuilder
 {
@@ -30,43 +30,14 @@ public:
         typedef void ChildNodeT;
         typedef void NodeTypeT;
     };
-    template<>
-    struct NodeTraits<root_Suffix>{
-        typedef std::string KeyTypeT;
-        typedef void ParentNodeT;
-        typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, first_Suffix> ChildNodeT;
-        typedef suffix_tree::suffix_tree_impl::RootNode<ContBuilder> NodeTypeT;
-    };
-    template<>
-    struct NodeTraits<first_Suffix>{
-        typedef std::string KeyTypeT;
-        typedef suffix_tree::suffix_tree_impl::RootNode<ContBuilder> ParentNodeT;
-        typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, second_Suffix>  ChildNodeT;
-        typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, first_Suffix> NodeTypeT;
-    };
-    template<>
-    struct NodeTraits<second_Suffix>{
-        typedef std::string KeyTypeT;
-        typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, first_Suffix> ParentNodeT;
-        typedef suffix_tree::suffix_tree_impl::LeafNode<ContBuilder, ValueT> ChildNodeT;
-        typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, second_Suffix> NodeTypeT;
-    };
 
-    template<>
-    struct NodeTraits<leaf_Suffix>{
-        typedef std::string KeyTypeT;
-        typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, second_Suffix> ParentNodeT;
-        typedef suffix_tree::suffix_tree_impl::LeafNode<ContBuilder, ValueT> NodeTypeT;
-
-        static ValueT defaultValue(){return ValueT();}
-    };
-
-    ContBuilder();
+    explicit ContBuilder(char delimeter = '-');
     ContBuilder(
             const Key2IdxT &lvl1, 
             const Key2IdxT &lvl2, 
             const Key2IdxT &lvl3, 
-            const Key2IdxT &lvl4);
+            const Key2IdxT &lvl4,
+            char delimeter = '-');
     ~ContBuilder();
 
     size_t levels()const;
@@ -106,4 +77,35 @@ private:
 
     MetaDataPerLevelsT meta_;
     char delimeter_;
+};
+
+template<>
+struct ContBuilder::NodeTraits<ContBuilder::root_Suffix>{
+    typedef std::string KeyTypeT;
+    typedef void ParentNodeT;
+    typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, first_Suffix> ChildNodeT;
+    typedef suffix_tree::suffix_tree_impl::RootNode<ContBuilder> NodeTypeT;
+};
+template<>
+struct ContBuilder::NodeTraits<ContBuilder::first_Suffix>{
+    typedef std::string KeyTypeT;
+    typedef suffix_tree::suffix_tree_impl::RootNode<ContBuilder> ParentNodeT;
+    typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, second_Suffix>  ChildNodeT;
+    typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, first_Suffix> NodeTypeT;
+};
+template<>
+struct ContBuilder::NodeTraits<ContBuilder::second_Suffix>{
+    typedef std::string KeyTypeT;
+    typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, first_Suffix> ParentNodeT;
+    typedef suffix_tree::suffix_tree_impl::LeafNode<ContBuilder, ValueT> ChildNodeT;
+    typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, second_Suffix> NodeTypeT;
+};
+
+template<>
+struct ContBuilder::NodeTraits<ContBuilder::leaf_Suffix>{
+    typedef std::string KeyTypeT;
+    typedef suffix_tree::suffix_tree_impl::SuffixNode<ContBuilder, second_Suffix> ParentNodeT;
+    typedef suffix_tree::suffix_tree_impl::LeafNode<ContBuilder, ValueT> NodeTypeT;
+
+    static ValueT defaultValue(){return ValueT();}
 };

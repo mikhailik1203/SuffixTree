@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <limits>
+#include <memory>
 #include <algorithm>
 #include <functional>
 
@@ -20,10 +21,10 @@ namespace suffix_tree_impl{
     class RootNode
     {
         static const typename MetaT::SuffixLevel NODE_LEVEL = MetaT::root_Suffix;
-        typedef typename MetaT::NodeTraits<NODE_LEVEL>::ChildNodeT ChildNodeT;
+        typedef typename MetaT::template NodeTraits<NODE_LEVEL>::ChildNodeT ChildNodeT;
         typedef std::vector<ChildNodeT *> SubNotesT;
     public:
-        RootNode(
+        explicit RootNode(
                 const MetaT &metaInfo): 
             metaInfo_(metaInfo)
         {
@@ -133,7 +134,7 @@ namespace suffix_tree_impl{
     template<typename MetaT, typename MetaT::SuffixLevel NODE_LEVEL>
     class SuffixNode
     {
-        typedef typename MetaT::NodeTraits<NODE_LEVEL> NodeTraitsT;
+        typedef typename MetaT::template NodeTraits<NODE_LEVEL> NodeTraitsT;
         typedef typename NodeTraitsT::ParentNodeT ParentNodeT;
         typedef typename NodeTraitsT::ChildNodeT ChildNodeT;
         typedef std::vector<ChildNodeT *> SubNotesT;
@@ -150,6 +151,9 @@ namespace suffix_tree_impl{
         {
             clear();
         }
+
+        SuffixNode(const SuffixNode &nd) = delete;
+        SuffixNode &operator=(const SuffixNode nd) = delete;
 
         void copy(
                 const SuffixNode &nd)
@@ -215,7 +219,7 @@ namespace suffix_tree_impl{
         const ChildNodeT *nextNode(
                 const ChildNodeT *node)const
         {
-            SubNotesT::const_iterator it = std::find(
+            typename SubNotesT::const_iterator it = std::find(
                             std::begin(childNodes_), std::end(childNodes_), node);
             if(std::end(childNodes_) == it)
                 return nullptr;
@@ -242,9 +246,6 @@ namespace suffix_tree_impl{
         }
 
     private:
-        SuffixNode(const SuffixNode &nd);
-        SuffixNode &operator=(const SuffixNode nd);
-
         SubNotesT childNodes_;
         ParentNodeT *parentNode_;
         const MetaT &metaInfo_;
@@ -254,7 +255,7 @@ namespace suffix_tree_impl{
     template<typename MetaT, typename ValueT>
     class LeafNode
     {
-        typedef typename MetaT::NodeTraits<MetaT::leaf_Suffix> NodeTraitsT;
+        typedef typename MetaT::template NodeTraits<MetaT::leaf_Suffix> NodeTraitsT;
         typedef typename NodeTraitsT::ParentNodeT ParentNodeT;
         typedef std::vector<ValueT> ValuesT;
 
@@ -274,6 +275,9 @@ namespace suffix_tree_impl{
             optional_.resize(count, VALUE_MISSED);
         }
         ~LeafNode(){}
+
+        LeafNode(const LeafNode &nd) = delete;
+        LeafNode &operator=(const LeafNode nd) = delete;
 
         void copy(
                 const LeafNode &nd)
@@ -366,10 +370,8 @@ namespace suffix_tree_impl{
 
 
         const ParentNodeT *parent()const{return parentNode_;}
-    private:
-        LeafNode(const LeafNode &nd);
-        LeafNode &operator=(const LeafNode nd);
 
+    private:
         ParentNodeT *parentNode_;
         mutable ValuesT values_;
         ValueOptionalT optional_;
@@ -382,7 +384,7 @@ template<typename ContT>
 class SuffixTreeIterator : public std::iterator<std::forward_iterator_tag, typename ContT::ValueT>
 {
     typedef typename ContT::ValueT ValueT;
-    typedef typename ContT::BuilderT::NodeTraits<ContT::BuilderT::leaf_Suffix>::NodeTypeT LeafNodeT;
+    typedef typename ContT::BuilderT::template NodeTraits<ContT::BuilderT::leaf_Suffix>::NodeTypeT LeafNodeT;
     
     friend ContT;
 public:
@@ -478,21 +480,21 @@ private:
     suffix_tree_impl::IndexT index_;
 };
 
-template<typename ContBuilderT, typename KeyT, typename ContValueT>
+template<class ContBuilderT, typename KeyT, typename ContValueT>
 class SuffixTree
 {
 public:
     typedef ContBuilderT BuilderT;
     typedef ContValueT ValueT;
     typedef SuffixTree<ContBuilderT, KeyT, ContValueT> ThisTypeT;
-    typedef typename SuffixTreeIterator<ThisTypeT> Iterator;
-    typedef typename ContBuilderT::NodeTraits<ContBuilderT::leaf_Suffix>::NodeTypeT LeafNodeT;
+    typedef SuffixTreeIterator<ThisTypeT> Iterator;
+    typedef typename ContBuilderT::template NodeTraits<ContBuilderT::leaf_Suffix>::NodeTypeT LeafNodeT;
     typedef std::function<Iterator(LeafNodeT *node)> NodeFunctorT;
     typedef std::function<Iterator(const LeafNodeT *node)> CNodeFunctorT;
     typedef suffix_tree_impl::RootNode<BuilderT> RootNodeT;
 
 public:
-    SuffixTree(
+    explicit SuffixTree(
             const BuilderT &builder):
         builder_(builder), 
         root_(new suffix_tree_impl::RootNode<BuilderT>(builder)), 
@@ -541,7 +543,7 @@ public:
             const KeyT &key, 
             const ValueT &val)
     {
-        ContBuilderT::ParsedKeyT parsedKey;
+        typename ContBuilderT::ParsedKeyT parsedKey;
         if(!builder_.parseNewKey(key, parsedKey))
             return end();
         size_t index = 0;
@@ -558,7 +560,7 @@ public:
 
     Iterator find(const KeyT &key)const
     {
-        ContBuilderT::ParsedKeyT parsedKey;
+        typename ContBuilderT::ParsedKeyT parsedKey;
         if(!builder_.parseKey(key, parsedKey))
             return end();
         size_t index = 0;
@@ -575,7 +577,7 @@ public:
 
     Iterator erase(const KeyT &key)
     {
-        ContBuilderT::ParsedKeyT parsedKey;
+        typename ContBuilderT::ParsedKeyT parsedKey;
         if(!builder_.parseKey(key, parsedKey))
             return end();
         size_t index = 0;
@@ -596,7 +598,7 @@ public:
         if(end() == it)
             return end();
         Iterator nextIt = it.next();
-        if(const_cast<Iterator::LeafNodeT *>(it.node())->erase(it.index()))
+        if(const_cast<typename Iterator::LeafNodeT *>(it.node())->erase(it.index()))
             --size_;
         return nextIt;
     }
@@ -624,8 +626,7 @@ private:
     }
 
     Iterator applyFunc(
-                suffix_tree_impl::SuffixNode<typename ContBuilderT, 
-                        static_cast<typename ContBuilderT::SuffixLevel>(ContBuilderT::leaf_Suffix - 1)> *node, 
+                suffix_tree_impl::SuffixNode<BuilderT, static_cast<typename BuilderT::SuffixLevel>(BuilderT::leaf_Suffix - 1)> *node,
                 const typename ContBuilderT::ParsedKeyT &key, 
                 size_t &index, 
                 NodeFunctorT func)const
@@ -649,8 +650,8 @@ private:
     }
 
     Iterator applyFunc(
-                const suffix_tree_impl::SuffixNode<typename ContBuilderT, 
-                        static_cast<typename ContBuilderT::SuffixLevel>(ContBuilderT::leaf_Suffix - 1)> *node, 
+                const suffix_tree_impl::SuffixNode<BuilderT,
+                        static_cast<typename BuilderT::SuffixLevel>(BuilderT::leaf_Suffix - 1)> *node,
                 CNodeFunctorT func)const
     {
         const auto *childNode = node->begin();

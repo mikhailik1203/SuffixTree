@@ -1,24 +1,45 @@
-#include "StdAfx.h"
 #include "StaticContBuilder.h"
+#include <cstring>
 
-using namespace suffix_tree;
+using namespace st_suffix_tree;
+
+namespace{
+    void makeDeepCopy(MetaDataPerLevelsT &meta, const Key2IdxT &vals)
+    {
+        meta.push_back(Key2IdxT());
+        Key2IdxT &mVal = meta.back();
+        mVal.reserve(vals.size());
+        for(auto &v: vals){
+            mVal.push_back(v.c_str());
+        }
+    }
+
+}
 
 StaticContBuilder::StaticContBuilder(
-        const Key2IdxT &lvl1, 
+        const Key2IdxT &lvl1,
         const Key2IdxT &lvl2, 
         const Key2IdxT &lvl3, 
-        const Key2IdxT &lvl4):
-    delimeter_('-')
+        const Key2IdxT &lvl4,
+        char delimeter):
+    delimeter_(delimeter)
 {
     meta_.reserve(4);
+#ifdef MEM_USAGE_TEST_
+    makeDeepCopy(meta_, lvl1);
+    makeDeepCopy(meta_, lvl2);
+    makeDeepCopy(meta_, lvl3);
+    makeDeepCopy(meta_, lvl4);
+#else
     meta_.push_back(lvl1);
     meta_.push_back(lvl2);
     meta_.push_back(lvl3);
     meta_.push_back(lvl4);
-    std::sort(meta_[0].begin(), meta_[0].end());
-    std::sort(meta_[1].begin(), meta_[1].end());
-    std::sort(meta_[2].begin(), meta_[2].end());
-    std::sort(meta_[3].begin(), meta_[3].end());
+#endif
+    std::sort(std::begin(meta_[0]), std::end(meta_[0]));
+    std::sort(std::begin(meta_[1]), std::end(meta_[1]));
+    std::sort(std::begin(meta_[2]), std::end(meta_[2]));
+    std::sort(std::begin(meta_[3]), std::end(meta_[3]));
 }
 
 StaticContBuilder::~StaticContBuilder()
@@ -34,8 +55,8 @@ bool StaticContBuilder::getKeyIndex(
             size_t level, 
             const KeyT &key, 
             size_t startIdx, 
-            size_t endIdx, 
-            suffix_tree::suffix_tree_impl::IndexT &index)const
+            size_t endIdx,
+            st_suffix_tree::st_suffix_tree_impl::IndexT &index)const
 {
     const Key2IdxT &levelKeys = meta_[level];
     const char *pVal = key.c_str() + startIdx;
@@ -62,7 +83,7 @@ bool StaticContBuilder::parseKey(
     size_t totalLen = key.length();
     for(size_t i = 0; i < totalLen; ++i){
         if(delimeter_ == key[i]){
-            suffix_tree::suffix_tree_impl::IndexT index = 0;
+            st_suffix_tree::st_suffix_tree_impl::IndexT index = 0;
             if(!getKeyIndex(currLevel, key, startIdx, i, index))
                 return false;
             res[currLevel] = index;
@@ -71,7 +92,7 @@ bool StaticContBuilder::parseKey(
         }
     }
     if(startIdx < totalLen){
-        suffix_tree::suffix_tree_impl::IndexT index = 0;
+        st_suffix_tree::st_suffix_tree_impl::IndexT index = 0;
         if(!getKeyIndex(currLevel, key, startIdx, totalLen, index))
             return false;
         res[currLevel] = index;

@@ -2,10 +2,12 @@
 
 #include <vector>
 #include <string>
-#include "SuffixTree.h"
+#include "StaticSuffixTree.h"
 
 typedef std::string KeyT;
 typedef std::vector<KeyT> Key2IdxT;
+
+typedef std::vector<Key2IdxT> MetaDataPerLevelsT;
 
 class StaticContBuilder
 {
@@ -18,13 +20,14 @@ public:
         second_Suffix,
         leaf_Suffix
     };
-    typedef suffix_tree::suffix_tree_impl::IndexT ParsedKeyT[leaf_Suffix + 1];
+    typedef st_suffix_tree::st_suffix_tree_impl::IndexT ParsedKeyT[leaf_Suffix + 1];
 
     StaticContBuilder(
-            const Key2IdxT &lvl1, 
+            const Key2IdxT &lvl1,
             const Key2IdxT &lvl2, 
             const Key2IdxT &lvl3, 
-            const Key2IdxT &lvl4);
+            const Key2IdxT &lvl4,
+            char delimeter = '-');
     ~StaticContBuilder();
 
     bool parseKey(
@@ -43,10 +46,9 @@ protected:
             size_t level, 
             const KeyT &key, 
             size_t startIdx, 
-            size_t endIdx, 
-            suffix_tree::suffix_tree_impl::IndexT &index)const;
+            size_t endIdx,
+            st_suffix_tree::st_suffix_tree_impl::IndexT &index)const;
 private:
-    typedef std::vector<Key2IdxT> MetaDataPerLevelsT;
 
     MetaDataPerLevelsT meta_;
     char delimeter_;

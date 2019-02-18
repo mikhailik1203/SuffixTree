@@ -2,6 +2,7 @@
 
 #include <string>
 
+
 namespace mem_alloc{
     struct AllocHeader 
     {
@@ -9,14 +10,21 @@ namespace mem_alloc{
         size_t size_;
     };
 
-    void * MyAlloc(size_t cbSize, char *, UINT);
+    void * MyAlloc(size_t cbSize);
     void MyDelete(void *p);
     size_t processMemUsage();
 }
 
 #if defined(MEM_USAGE_TEST_)
-void * _cdecl operator new (size_t cbSize);
-void * _cdecl operator new (size_t cbSize, int nAnyIntParam, char *szFile = __FILE__, UINT nLineNo = __LINE__);
-void  _cdecl operator delete(void *p);
+void * operator new (size_t cbSize);
+void * operator new (size_t cbSize, const std::nothrow_t&);
+void * operator new (size_t cbSize, int nAnyIntParam, char *szFile, unsigned nLineNo);
+void  operator delete(void *p) noexcept;
+void  operator delete(void *p, const std::nothrow_t&) noexcept;
+
+
+void *__wrap_malloc(size_t size);
+void __wrap_free(void *ptr);
+
 #endif
 

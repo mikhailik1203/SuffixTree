@@ -107,7 +107,7 @@ public:
     typedef ContBuilderT BuilderT;
     typedef ContValueT ValueT;
     typedef StaticSuffixTree<ContBuilderT, KeyT, ContValueT> ThisTypeT;
-    typedef typename SuffixTreeIterator<ThisTypeT> Iterator;
+    typedef SuffixTreeIterator<ThisTypeT> Iterator;
 
     friend Iterator;
 public:
@@ -118,7 +118,7 @@ public:
         size_t totalSize = 1;
         for(size_t lvl = BuilderT::root_Suffix; lvl <= BuilderT::leaf_Suffix; ++lvl)
         {
-            totalSize *= builder.suffixCount(static_cast<BuilderT::SuffixLevel>(lvl));
+            totalSize *= builder.suffixCount(static_cast<typename BuilderT::SuffixLevel>(lvl));
         }
         optional_.assign(totalSize, 0);
         values_.assign(totalSize, BuilderT::defaultValue());
@@ -160,7 +160,7 @@ public:
             const KeyT &key, 
             const ValueT &val)
     {
-        ContBuilderT::ParsedKeyT parsedKey;
+        typename ContBuilderT::ParsedKeyT parsedKey;
         if(!builder_.parseKey(key, parsedKey))
             return end();
 
@@ -174,7 +174,7 @@ public:
 
     Iterator find(const KeyT &key)const
     {
-        ContBuilderT::ParsedKeyT parsedKey;
+        typename ContBuilderT::ParsedKeyT parsedKey;
         if(!builder_.parseKey(key, parsedKey))
             return end();
         size_t index = calcIndex(parsedKey);
@@ -185,7 +185,7 @@ public:
 
     Iterator erase(const KeyT &key)
     {
-        ContBuilderT::ParsedKeyT parsedKey;
+        typename ContBuilderT::ParsedKeyT parsedKey;
         if(!builder_.parseKey(key, parsedKey))
             return end();
         size_t index = calcIndex(parsedKey);
@@ -244,7 +244,7 @@ private:
         size_t index = key[BuilderT::root_Suffix];
         for(size_t lvl = BuilderT::root_Suffix + 1; lvl <= BuilderT::leaf_Suffix; ++lvl)
         {
-            index = index*builder_.suffixCount(static_cast<BuilderT::SuffixLevel>(lvl)) + key[lvl];
+            index = index*builder_.suffixCount(static_cast<typename BuilderT::SuffixLevel>(lvl)) + key[lvl];
         }
         return index;
     }

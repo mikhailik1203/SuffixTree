@@ -1,35 +1,40 @@
-#include "stdafx.h"
 #include "hpUtils.h"
+#include <ratio>
+#ifdef __linux__
+#include <sched.h>
+#endif
 
 std::string hptimer::HighPerfTimer::UNITS = "nsec";
 
 hptimer::HighPerfTimer::HighPerfTimer()
 {
-    QueryPerformanceFrequency(&timerFreq_); 
 }
 
 double hptimer::HighPerfTimer::granularity()const
 {
-    return double(1000000000)/timerFreq_.QuadPart;
+    std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(e - s).count();
 }
 
 void hptimer::HighPerfTimer::start()
 {
-    QueryPerformanceCounter(&startTime_);
+    startTime_ = std::chrono::high_resolution_clock::now();
 }
 void hptimer::HighPerfTimer::stop()
 {
-    QueryPerformanceCounter(&finishTime_);
+    finishTime_ = std::chrono::high_resolution_clock::now();
 }
 
 double hptimer::HighPerfTimer::interval()const
 {
-    return double(finishTime_.QuadPart - startTime_.QuadPart)*1000000000/timerFreq_.QuadPart;
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(finishTime_ - startTime_).count();
 }
 
 bool hptimer::setProcessAffinity(char cpuId)
 {
-    HANDLE process = GetCurrentProcess();
-    DWORD_PTR processAffinityMask = 1 << cpuId;
-    return TRUE == SetProcessAffinityMask(process, processAffinityMask);    
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(cpuId, &mask);
+    int status = sched_setaffinity(0, sizeof(mask), &mask);
 }

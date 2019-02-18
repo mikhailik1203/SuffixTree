@@ -1,4 +1,3 @@
-#include "StdAfx.h"
 #include "ContBuilder.h"
 
 using namespace suffix_tree;
@@ -12,26 +11,28 @@ namespace{
             std::begin(vals), std::end(vals), 
             [&](const KeyT &v)
             {
-                res[v] = res.size();
+                res[v.c_str()] = res.size();
             });
         return res;
     }
 }
 
-ContBuilder::ContBuilder():
-    delimeter_('-')
+ContBuilder::ContBuilder(char delimeter):
+    delimeter_(delimeter)
 {
     meta_.reserve(total_Suffix);
-    for(size_t i = 0; i < total_Suffix; ++i)
+    for(size_t i = 0; i < total_Suffix; ++i){
         meta_.push_back(Key2IndexT());
+    }
 }
 
 ContBuilder::ContBuilder(
         const Key2IdxT &lvl1, 
         const Key2IdxT &lvl2, 
         const Key2IdxT &lvl3, 
-        const Key2IdxT &lvl4):
-    delimeter_('-')
+        const Key2IdxT &lvl4,
+        char delimeter):
+    delimeter_(delimeter)
 {
     meta_.reserve(4);
     meta_.push_back(toKey2IndexT(lvl1));
@@ -67,18 +68,6 @@ bool ContBuilder::getKeyIndex(
     if(std::end(levelKeys) == it)
         return false;
     index = it->second;
-    /*const char *pVal = key.c_str() + startIdx;
-    size_t count = endIdx - startIdx;
-    auto keyIt = std::lower_bound(
-            std::begin(levelKeys), std::end(levelKeys), key, 
-            [&](const Key2IdxT::value_type &lft, const KeyT &key)->bool
-            {
-                return 0 > strncmp(lft.c_str(), pVal, count);
-            });
-    if(std::end(levelKeys) == keyIt || 
-       0 != strncmp(keyIt->c_str(), pVal, count))
-        return false;
-    index = keyIt - std::begin(levelKeys);*/
     return true;
 }
 
@@ -91,6 +80,8 @@ void ContBuilder::getNewKeyIndex(
 {
     Key2IndexT &levelKeys = meta_[level];
     std::string k(key.c_str() + startIdx,  endIdx - startIdx);
+    if(k.empty())
+        levelKeys.find(k);
     auto it = levelKeys.find(k);
     if(std::end(levelKeys) != it){
         index = it->second;

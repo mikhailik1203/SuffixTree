@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <chrono>
 
 namespace hptimer{
     class HighPerfTimer{
@@ -14,8 +15,7 @@ namespace hptimer{
         double granularity()const;
     private:
         static std::string UNITS;
-        LARGE_INTEGER startTime_, finishTime_;
-        LARGE_INTEGER timerFreq_;
+        std::chrono::high_resolution_clock::time_point startTime_, finishTime_;
     };
 
     bool setProcessAffinity(char cpuId);
