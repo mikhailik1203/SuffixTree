@@ -30,7 +30,7 @@ namespace tst{
                 keyVals.lvl3Key_,
                 keyVals.lvl4Key_);
         size_t memUsageBefore = mem_alloc::processMemUsage();
-        typedef suffix_tree::SuffixTree<ContBuilder, std::string, int> ContT;
+        typedef suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> ContT;
         ContT cont(builder);
         size_t memUsageAfterCreate = mem_alloc::processMemUsage();
         stat.initStat_.memUsage_ = memUsageAfterCreate - memUsageBeforeCreate;
@@ -74,7 +74,7 @@ namespace tst{
         size_t memUsageBeforeCreate = mem_alloc::processMemUsage();
         ContBuilder builder;
         size_t memUsageBefore = mem_alloc::processMemUsage();
-        typedef suffix_tree::SuffixTree<ContBuilder, std::string, int> ContT;
+        typedef suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> ContT;
         ContT cont(builder);
         size_t memUsageAfterCreate = mem_alloc::processMemUsage();
         stat.initStat_.memUsage_ = memUsageAfterCreate - memUsageBeforeCreate;

@@ -139,7 +139,7 @@ public:
     {
         std::swap(builder_, sft.builder_);
         std::swap(values_, sft.values_);
-        std::swap(optional_, sft.optional_);
+        optional_ = sft.optional_;
         size_ = sft.size_;
     }
 

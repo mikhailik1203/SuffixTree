@@ -1,3 +1,11 @@
+#if !defined(MEM_USAGE_TEST_) && !defined(PERFORMANCE_TEST_)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wterminate"
+#include <boost/test/unit_test.hpp>
+#pragma GCC diagnostic pop
+
 #include "SuffixTree.h"
 #include "ContBuilder.h"
 #include "hpUtils.h"
@@ -152,13 +160,13 @@ namespace{
 
 }
 
-namespace tst{
+BOOST_AUTO_TEST_SUITE( suffix_tree_test )
 
 
-    void vanillaTest()
+    BOOST_AUTO_TEST_CASE(vanillaTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT > cont(builder);
         assert(0 == cont.size());
         auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
         assert(1 == cont.size());
@@ -167,10 +175,10 @@ namespace tst{
         assert(cont.end() == cont.find("aaa-bbb-cca-ddd"));
     }
 
-    void invalidKeyTest()
+    BOOST_AUTO_TEST_CASE(invalidKeyTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         /// key with 3 subkeys, while 4 subkeys are expected
         auto it = cont.insert("aaa-bbb-dda", 777);
@@ -180,10 +188,10 @@ namespace tst{
         assert(cont.end() == cont.erase("aaa-bbb-dda"));
     }
 
-    void findNonexistTest()
+    BOOST_AUTO_TEST_CASE(findNonexistTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
         assert(1 == cont.size());
@@ -191,10 +199,10 @@ namespace tst{
         assert(cont.end() == cont.find("aaa-bbb-cca-ddd"));
     }
 
-    void insertDuplicateTest()
+    BOOST_AUTO_TEST_CASE(insertDuplicateTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
         assert(1 == cont.size());
@@ -206,10 +214,10 @@ namespace tst{
         assert(888 == it2.value());
     }
 
-    void eraseByKeyTest()
+    BOOST_AUTO_TEST_CASE(eraseByKeyTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
         assert(1 == cont.size());
@@ -219,10 +227,10 @@ namespace tst{
         assert(0 == cont.size());
     }
 
-    void eraseAgainByKeyTest()
+    BOOST_AUTO_TEST_CASE(eraseAgainByKeyTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
         assert(1 == cont.size());
@@ -236,10 +244,10 @@ namespace tst{
         assert(cont.end() == it);
     }
 
-    void eraseByIteratorTest()
+    BOOST_AUTO_TEST_CASE(eraseByIteratorTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
         assert(1 == cont.size());
@@ -274,10 +282,10 @@ namespace tst{
         assert(cont.end() == itAfterErase);
     }
 
-    void setByIteratorTest()
+    BOOST_AUTO_TEST_CASE(setByIteratorTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
         assert(1 == cont.size());
@@ -291,10 +299,10 @@ namespace tst{
         assert(7778 == *it1);
     }
 
-    void beginIteratorTest()
+    BOOST_AUTO_TEST_CASE(beginIteratorTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
         assert(1 == cont.size());
@@ -317,13 +325,13 @@ namespace tst{
         assert(333 == itBegin.value());
     }
 
-    void copyEmptyContainerTest()
+    BOOST_AUTO_TEST_CASE(copyEmptyContainerTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
 
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> contCopy(cont);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> contCopy(cont);
         assert(0 == contCopy.size());
 
         auto it = cont.insert("aaa-bbb-ccc-ddd", 777);
@@ -335,10 +343,10 @@ namespace tst{
         assert(contCopy.end() == it1);
     }
 
-    void copyContainerTest()
+    BOOST_AUTO_TEST_CASE(copyContainerTest)
     {
         ContBuilder builder(prepareLevel1Keys(), prepareLevel2Keys(), prepareLevel3Keys(), prepareLevel4Keys());
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         auto it2 = cont.insert("aaa-bbb-ccc-ddd", 777);
         auto it1 = cont.insert("aaa-bba-cca-dda", 1111);
@@ -354,7 +362,7 @@ namespace tst{
         assert(cont.end() != it4);
         assert(99 == *it4);
 
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> contCopy(cont);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> contCopy(cont);
         assert(4 == contCopy.size());
         *it1 = 11112;
         *it2 = 7772;
@@ -375,10 +383,10 @@ namespace tst{
         assert(99 == *cit);
     }
 
-    void addNewKeyTest()
+    BOOST_AUTO_TEST_CASE(addNewKeyTest)
     {
         ContBuilder builder;
-        suffix_tree::SuffixTree<ContBuilder, std::string, int> cont(builder);
+        suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> cont(builder);
         assert(0 == cont.size());
         auto it = cont.insert("new-sub-key-test", 1234);
         assert(1 == cont.size());
@@ -387,21 +395,7 @@ namespace tst{
         assert(cont.end() == cont.find("aaa-bbb-cca-ddd"));
     }
 
-    void containerTestSuite()
-    {
-        vanillaTest();
-        invalidKeyTest();
-        findNonexistTest();
-        insertDuplicateTest();
-        eraseByKeyTest();
-        eraseAgainByKeyTest();
-        eraseByIteratorTest();
-        beginIteratorTest();
-        setByIteratorTest();
-        copyEmptyContainerTest();
-        copyContainerTest();
-        addNewKeyTest();
-    }
 
-}
+BOOST_AUTO_TEST_SUITE_END()
 
+#endif

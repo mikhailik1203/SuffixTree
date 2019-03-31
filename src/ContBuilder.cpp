@@ -1,4 +1,5 @@
 #include "ContBuilder.h"
+#include <cstring>
 
 using namespace suffix_tree;
 
@@ -44,7 +45,7 @@ ContBuilder::ContBuilder(
 ContBuilder::~ContBuilder()
 {}
 
-size_t ContBuilder::levels()const
+size_t ContBuilder::levels()const noexcept
 {
     return meta_.size();
 }
@@ -60,7 +61,7 @@ bool ContBuilder::getKeyIndex(
             const KeyT &key, 
             size_t startIdx, 
             size_t endIdx, 
-            suffix_tree::suffix_tree_impl::IndexT &index)const
+            size_t &index)const
 {
     const Key2IndexT &levelKeys = meta_[level];
     std::string k(key.c_str() + startIdx,  endIdx - startIdx);
@@ -75,8 +76,8 @@ void ContBuilder::getNewKeyIndex(
             size_t level, 
             const KeyT &key, 
             size_t startIdx, 
-            size_t endIdx, 
-            suffix_tree::suffix_tree_impl::IndexT &index)
+            size_t endIdx,
+            size_t &index)
 {
     Key2IndexT &levelKeys = meta_[level];
     std::string k(key.c_str() + startIdx,  endIdx - startIdx);
@@ -100,7 +101,7 @@ bool ContBuilder::parseKey(
     size_t totalLen = key.length();
     for(size_t i = 0; i < totalLen; ++i){
         if(delimeter_ == key[i]){
-            suffix_tree::suffix_tree_impl::IndexT index = 0;
+            size_t index = 0;
             if(!getKeyIndex(currLevel, key, startIdx, i, index))
                 return false;
             res[currLevel] = index;
@@ -109,7 +110,7 @@ bool ContBuilder::parseKey(
         }
     }
     if(startIdx < totalLen){
-        suffix_tree::suffix_tree_impl::IndexT index = 0;
+        size_t index = 0;
         if(!getKeyIndex(currLevel, key, startIdx, totalLen, index))
             return false;
         res[currLevel] = index;
@@ -123,23 +124,36 @@ bool ContBuilder::parseNewKey(
 {
     size_t currLevel = 0;
     size_t totalLen = key.length();
+    size_t lenLeft = totalLen;
     size_t tokenLastPosition[total_Suffix];
-    for(size_t i = 0; i < totalLen; ++i){
+    const char *startPtr = key.c_str();
+    const char *bufferPtr = startPtr;
+    const char *ptr = nullptr;
+    while(nullptr != (ptr = reinterpret_cast<const char *>(memchr(bufferPtr, delimeter_, lenLeft)))){
+        tokenLastPosition[currLevel] = ptr - startPtr;
+        ++currLevel;
+        if(total_Suffix <= currLevel) /// too many tokens in key
+            return false;
+        lenLeft -= ptr - bufferPtr + 1;
+        bufferPtr = ptr + 1;
+    }
+
+    /*for(size_t i = 0; i < totalLen; ++i){
         if(delimeter_ == key[i]){
             tokenLastPosition[currLevel] = i;
             ++currLevel;
             if(total_Suffix <= currLevel) /// too many tokens in key
                 return false;
         }
-    }
-    tokenLastPosition[currLevel] = totalLen;
+    }*/
     if(total_Suffix != currLevel + 1)
         return false;
+    tokenLastPosition[currLevel] = totalLen;
 
     size_t startIdx = 0;
     for(size_t i = 0; i < total_Suffix; ++i){
         size_t lastIdx = tokenLastPosition[i];
-        suffix_tree::suffix_tree_impl::IndexT index = 0;
+        size_t index = 0;
         getNewKeyIndex(i, key, startIdx, lastIdx, index);
         res[i] = index;
         startIdx = lastIdx + 1; ///skip delimeter

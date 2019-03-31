@@ -37,4 +37,5 @@ bool hptimer::setProcessAffinity(char cpuId)
     CPU_ZERO(&mask);
     CPU_SET(cpuId, &mask);
     int status = sched_setaffinity(0, sizeof(mask), &mask);
+    return 0 == status;
 }
