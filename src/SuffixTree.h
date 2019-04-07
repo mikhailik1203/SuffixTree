@@ -5,6 +5,7 @@
 #include <memory>
 #include <algorithm>
 #include <functional>
+#include <boost/dynamic_bitset.hpp>
 
 #include "ContAllocator.h"
 
@@ -93,7 +94,11 @@ namespace suffix_tree_impl{
         size_t next(
                 size_t index)const noexcept
         {
-            for(size_t i = index + 1; i != childNodes_.size(); ++i)
+            if(childNodes_.size() <= index)
+                return INVALID_INDEX;
+
+            auto childNodeCount = childNodes_.size();
+            for(size_t i = index + 1; i < childNodeCount; ++i)
             {
                 if(nullptr != childNodes_[i])
                     return i;
@@ -103,12 +108,13 @@ namespace suffix_tree_impl{
 
         const ChildNodeT *begin()const noexcept
         {
-            for(size_t i = 0; i != childNodes_.size(); ++i)
-            {
-                if(nullptr != childNodes_[i])
-                    return childNodes_[i];
-            }
-            return nullptr;
+            auto it = std::find_if(
+                    std::begin(childNodes_),
+                    std::end(childNodes_),
+                    [](const ChildNodeT * val){return nullptr != val;});
+            if(std::end(childNodes_) == it)
+                return nullptr;
+            return *it;
         }
 
         const ChildNodeT *nextNode(
@@ -226,7 +232,11 @@ namespace suffix_tree_impl{
         size_t next(
                 size_t index)const noexcept
         {
-            for(size_t i = index + 1; i != childNodes_.size(); ++i)
+            if(childNodes_.size() <= index)
+                return INVALID_INDEX;
+
+            auto childNodeCount = childNodes_.size();
+            for(size_t i = index + 1; i < childNodeCount; ++i)
             {
                 if(nullptr != childNodes_[i])
                     return i;
@@ -293,7 +303,7 @@ namespace suffix_tree_impl{
 
         static const bool VALUE_EXIST = true;
         static const bool VALUE_MISSED = false;
-        typedef std::vector<bool> ValueOptionalT;
+        typedef boost::dynamic_bitset<> ValueOptionalT;
 
     public:
         LeafNode(
@@ -329,7 +339,7 @@ namespace suffix_tree_impl{
             selfIndex_ = nd.selfIndex_;
         }
 
-        ~LeafNode(){}
+        ~LeafNode() = default;
 
         LeafNode(const LeafNode &nd) = delete;
         LeafNode &operator=(const LeafNode nd) = delete;
@@ -355,7 +365,7 @@ namespace suffix_tree_impl{
         ValueT &get(
                 size_t index)const
         {
-            if((values_.size() <= index) || (VALUE_MISSED == optional_[index]))
+            if((optional_.size() <= index) || (VALUE_MISSED == optional_[index]))
                 throw std::runtime_error("LeafNode::get: element is not exist at index");
             return values_[index];
         }
@@ -379,22 +389,18 @@ namespace suffix_tree_impl{
         size_t next(
                 size_t index)const noexcept
         {
-            for(size_t i = index + 1; i != optional_.size(); ++i)
-            {
-                if(VALUE_EXIST == optional_[i])
-                    return i;
-            }
-            return INVALID_INDEX;
+            auto idx = optional_.find_next(index);
+            if(ValueOptionalT::npos == idx)
+                return INVALID_INDEX;
+            return idx;
         }
 
         size_t begin()const noexcept
         {
-            for(size_t i = 0; i != optional_.size(); ++i)
-            {
-                if(VALUE_EXIST == optional_[i])
-                    return i;
-            }
-            return INVALID_INDEX;
+            auto idx = optional_.find_first();
+            if(ValueOptionalT::npos == idx)
+                return INVALID_INDEX;
+            return idx;
         }
 
 
@@ -443,8 +449,7 @@ public:
         return *this;
     }
 
-    ~SuffixTreeIterator()
-    {}
+    ~SuffixTreeIterator() = default;
 
     ValueT& operator*(){
         if(nullptr == node_)
@@ -637,7 +642,6 @@ public:
                     --size_;
                 return nextIt;
             };
-        ///todo: erase parent node, if last child node was erased
         return applyFunc(root_.get(), parsedKey, index, eraseFunc);
     }
 
@@ -674,7 +678,10 @@ private:
     }
 
     Iterator applyFunc(
-                suffix_tree_impl::SuffixNode<BuilderT, static_cast<typename BuilderT::SuffixLevel>(BuilderT::leaf_Suffix - 1), ContAllocatorT> *node,
+                suffix_tree_impl::SuffixNode<
+                        BuilderT,
+                        static_cast<typename BuilderT::SuffixLevel>(BuilderT::leaf_Suffix - 1),
+                        ContAllocatorT> *node,
                 const typename ContBuilderT::ParsedKeyT &key, 
                 size_t &index, 
                 NodeFunctorT func)const
@@ -697,8 +704,10 @@ private:
     }
 
     Iterator applyFunc(
-                const suffix_tree_impl::SuffixNode<BuilderT,
-                        static_cast<typename BuilderT::SuffixLevel>(BuilderT::leaf_Suffix - 1), ContAllocatorT> *node,
+                const suffix_tree_impl::SuffixNode<
+                        BuilderT,
+                        static_cast<typename BuilderT::SuffixLevel>(BuilderT::leaf_Suffix - 1),
+                        ContAllocatorT> *node,
                 CNodeFunctorT func)const
     {
         const auto *childNode = node->begin();

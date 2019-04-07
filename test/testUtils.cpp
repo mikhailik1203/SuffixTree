@@ -12,9 +12,9 @@
 using namespace tst;
 
 namespace{
-    Key2IdxT prepareLevelKeys(char keyBase, char keyStart, size_t keyLength, size_t keyCount)
+    aux::Key2IdxT prepareLevelKeys(char keyBase, char keyStart, size_t keyLength, size_t keyCount)
     {
-        Key2IdxT res;
+        aux::Key2IdxT res;
 
         std::string value(keyLength, keyBase);
         value[keyLength - 1] = keyStart;
@@ -87,22 +87,22 @@ bool tst::operator == (const ComplexKey &l, const ComplexKey &v)
            (l.idx4_ == v.idx4_);
 }
 
-Key2IdxT tst::prepareLevel1Keys(size_t keyLength, size_t keyCount)
+aux::Key2IdxT tst::prepareLevel1Keys(size_t keyLength, size_t keyCount)
 {
     return prepareLevelKeys(KEY_START_SYMBOL, KEY_START_SYMBOL, keyLength, keyCount);
 }
 
-Key2IdxT tst::prepareLevel2Keys(size_t keyLength, size_t keyCount)
+aux::Key2IdxT tst::prepareLevel2Keys(size_t keyLength, size_t keyCount)
 {
     return prepareLevelKeys(KEY_START_SYMBOL + 1, KEY_START_SYMBOL, keyLength, keyCount);
 }
 
-Key2IdxT tst::prepareLevel3Keys(size_t keyLength, size_t keyCount)
+aux::Key2IdxT tst::prepareLevel3Keys(size_t keyLength, size_t keyCount)
 {
     return prepareLevelKeys(KEY_START_SYMBOL + 2, KEY_START_SYMBOL, keyLength, keyCount);
 }
 
-Key2IdxT tst::prepareLevel4Keys(size_t keyLength, size_t keyCount)
+aux::Key2IdxT tst::prepareLevel4Keys(size_t keyLength, size_t keyCount)
 {
     return prepareLevelKeys(KEY_START_SYMBOL + 3, KEY_START_SYMBOL, keyLength, keyCount);
 }
@@ -209,8 +209,6 @@ void tst::output(const std::string &names, size_t measurementCount, const Latenc
     std::cout << "Latency for " << names << ", count = " << data.count_*BATCH_COUNT<< ":"<< std::endl
             << "\tStartInterval;EndInterval;Quantity_X;Perc_X"<< std::endl;
     double startInterval = data.startInterval_;
-    double count1 = 0;
-    double count2 = 0;
     std::vector<double> counts(measurementCount, 0.0);
     for(size_t i = 0; i < data.bucketsCount_; ++i){
         double endInterval = startInterval + data.intervalLen_;

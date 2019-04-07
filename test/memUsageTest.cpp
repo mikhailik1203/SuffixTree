@@ -24,13 +24,13 @@ namespace tst{
         stat.name_ = ostr.str();
 
         size_t memUsageBeforeCreate = mem_alloc::processMemUsage();
-        ContBuilder builder(
+        aux::ContBuilder builder(
                 keyVals.lvl1Key_,
                 keyVals.lvl2Key_,
                 keyVals.lvl3Key_,
                 keyVals.lvl4Key_);
         size_t memUsageBefore = mem_alloc::processMemUsage();
-        typedef suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> ContT;
+        typedef suffix_tree::SuffixTree<aux::ContBuilder, std::string, int, aux::ContNodeAllocatorsT> ContT;
         ContT cont(builder);
         size_t memUsageAfterCreate = mem_alloc::processMemUsage();
         stat.initStat_.memUsage_ = memUsageAfterCreate - memUsageBeforeCreate;
@@ -72,9 +72,9 @@ namespace tst{
         stat.name_ = ostr.str();
 
         size_t memUsageBeforeCreate = mem_alloc::processMemUsage();
-        ContBuilder builder;
+        aux::ContBuilder builder;
         size_t memUsageBefore = mem_alloc::processMemUsage();
-        typedef suffix_tree::SuffixTree<ContBuilder, std::string, int, ContNodeAllocatorsT> ContT;
+        typedef suffix_tree::SuffixTree<aux::ContBuilder, std::string, int, aux::ContNodeAllocatorsT> ContT;
         ContT cont(builder);
         size_t memUsageAfterCreate = mem_alloc::processMemUsage();
         stat.initStat_.memUsage_ = memUsageAfterCreate - memUsageBeforeCreate;
@@ -154,7 +154,7 @@ namespace tst{
         stat.name_ = ostr.str();
 
         size_t memUsageBeforeCreate = mem_alloc::processMemUsage();
-        ContBuilder builder(
+        aux::ContBuilder builder(
                 keyVals.lvl1Key_,
                 keyVals.lvl2Key_,
                 keyVals.lvl3Key_,
@@ -170,7 +170,7 @@ namespace tst{
                 [&builder](ContT &cont, const std::string &k, const int &value)->void
                 {
                     ComplexKey complexKey;
-                    ContBuilder::ParsedKeyT parsedKey;
+                    aux::ContBuilder::ParsedKeyT parsedKey;
                     if(!builder.parseKey(k.c_str(), parsedKey))
                         throw std::runtime_error("Unable to parse string key to indexes");
                     complexKey.idx1_ = parsedKey[0];
@@ -189,7 +189,7 @@ namespace tst{
                 [&builder](ContT &cont, const std::string &k, const int &)->void
                 {
                     ComplexKey complexKey;
-                    ContBuilder::ParsedKeyT parsedKey;
+                    aux::ContBuilder::ParsedKeyT parsedKey;
                     if(!builder.parseKey(k.c_str(), parsedKey))
                         throw std::runtime_error("Unable to parse string key to indexes");
                     complexKey.idx1_ = parsedKey[0];
@@ -214,7 +214,7 @@ namespace tst{
 
         size_t memUsageBeforeCreate = mem_alloc::processMemUsage();
 
-        ContBuilder builder(
+        aux::ContBuilder builder(
                 keyVals.lvl1Key_,
                 keyVals.lvl2Key_,
                 keyVals.lvl3Key_,
@@ -262,7 +262,7 @@ namespace tst{
         stat.name_ = ostr.str();
 
         size_t memUsageBeforeCreate = mem_alloc::processMemUsage();
-        ContBuilder builder(
+        aux::ContBuilder builder(
                 keyVals.lvl1Key_,
                 keyVals.lvl2Key_,
                 keyVals.lvl3Key_,
@@ -280,7 +280,7 @@ namespace tst{
                 [&builder](ContT &cont, const std::string &k, const int &value)->void
                 {
                     ComplexKey complexKey;
-                    ContBuilder::ParsedKeyT parsedKey;
+                    aux::ContBuilder::ParsedKeyT parsedKey;
                     if(!builder.parseKey(k.c_str(), parsedKey))
                         throw std::runtime_error("Unable to parse string key to indexes");
                     complexKey.idx1_ = parsedKey[0];
@@ -303,7 +303,7 @@ namespace tst{
                 [&builder](ContT &cont, const std::string &k, const int &)->void
                 {
                     ComplexKey complexKey;
-                    ContBuilder::ParsedKeyT parsedKey;
+                    aux::ContBuilder::ParsedKeyT parsedKey;
                     if(!builder.parseKey(k.c_str(), parsedKey))
                         throw std::runtime_error("Unable to parse string key to indexes");
                     complexKey.idx1_ = parsedKey[0];
@@ -417,7 +417,7 @@ namespace tst{
         stat.name_ = ostr.str();
 
         size_t memUsageBeforeCreate = mem_alloc::processMemUsage();
-        ContBuilder builder(
+        aux::ContBuilder builder(
                 keyVals.lvl1Key_,
                 keyVals.lvl2Key_,
                 keyVals.lvl3Key_,
@@ -433,7 +433,7 @@ namespace tst{
                 cont,
                 [&builder](ContT &cont, const std::string &k, const int &value)->void
                 {
-                    ContBuilder::ParsedKeyT parsedKey;
+                    aux::ContBuilder::ParsedKeyT parsedKey;
                     if(!builder.parseKey(k, parsedKey))
                         throw std::runtime_error("Unable to parse string key to indexes");
                     ComplexKey complexKey = {parsedKey[0], parsedKey[1], parsedKey[2], parsedKey[3]};
@@ -449,7 +449,7 @@ namespace tst{
                 cont,
                 [&builder](ContT &cont, const std::string &k, const int &)->void
                 {
-                    ContBuilder::ParsedKeyT parsedKey;
+                    aux::ContBuilder::ParsedKeyT parsedKey;
                     if(!builder.parseKey(k, parsedKey))
                         throw std::runtime_error("Unable to parse string key to indexes");
                     ComplexKey complexKey = {parsedKey[0], parsedKey[1], parsedKey[2], parsedKey[3]};

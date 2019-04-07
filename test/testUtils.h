@@ -24,7 +24,7 @@ namespace tst{
     typedef std::vector<double> DurationsT;
 
     struct KeyValues{
-        Key2IdxT lvl1Key_, lvl2Key_, lvl3Key_, lvl4Key_;
+        aux::Key2IdxT lvl1Key_, lvl2Key_, lvl3Key_, lvl4Key_;
         GeneratedKeyT genKeys_;
         size_t subKeyLength_;
         size_t keysCount_;
@@ -56,10 +56,10 @@ namespace tst{
     bool operator == (const ComplexKey &l, const ComplexKey &v);
 
 
-    Key2IdxT prepareLevel1Keys(size_t keyLength, size_t keyCount);
-    Key2IdxT prepareLevel2Keys(size_t keyLength, size_t keyCount);
-    Key2IdxT prepareLevel3Keys(size_t keyLength, size_t keyCount);
-    Key2IdxT prepareLevel4Keys(size_t keyLength, size_t keyCount);
+    aux::Key2IdxT prepareLevel1Keys(size_t keyLength, size_t keyCount);
+    aux::Key2IdxT prepareLevel2Keys(size_t keyLength, size_t keyCount);
+    aux::Key2IdxT prepareLevel3Keys(size_t keyLength, size_t keyCount);
+    aux::Key2IdxT prepareLevel4Keys(size_t keyLength, size_t keyCount);
 
     GeneratedKeyT generateKeys(const KeyValues &keyVals, char delim = KEY_DELIMETER);
 

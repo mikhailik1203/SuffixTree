@@ -2,20 +2,42 @@
 #include <cstring>
 
 using namespace suffix_tree;
+using namespace aux;
 
 namespace{
     Key2IndexT toKey2IndexT(const Key2IdxT &vals)
     {
         Key2IndexT res;
-        size_t pos = 0;
         std::for_each(
-            std::begin(vals), std::end(vals), 
+            std::begin(vals), std::end(vals),
             [&](const KeyT &v)
             {
                 res[v.c_str()] = res.size();
             });
         return res;
     }
+
+    std::unique_ptr<const char[]> make_unique(std::string_view str) {
+        size_t count = str.size();
+        std::unique_ptr<char[]> p (new char [count + 1]);
+        memcpy(p.get(), str.data(), count + 1);
+        p.get()[count] = 0;
+        return move(p);
+    }
+
+    Key2IndexT toKey2IndexT(const Key2IdxT &vals, std::vector<std::unique_ptr<const char[]>> &storage)
+    {
+        Key2IndexT res;
+        std::for_each(
+                std::begin(vals), std::end(vals),
+                [&](const KeyT &v)
+                {
+                    storage.emplace_back(make_unique(v));
+                    res[storage.back().get()] = res.size();
+                });
+        return res;
+    }
+
 }
 
 ContBuilder::ContBuilder(char delimeter):
@@ -36,14 +58,41 @@ ContBuilder::ContBuilder(
     delimeter_(delimeter)
 {
     meta_.reserve(4);
-    meta_.push_back(toKey2IndexT(lvl1));
-    meta_.push_back(toKey2IndexT(lvl2));
-    meta_.push_back(toKey2IndexT(lvl3));
-    meta_.push_back(toKey2IndexT(lvl4));
+    keyStorage_.reserve(lvl1.size() + lvl2.size() + lvl3.size() + lvl4.size());
+    meta_.emplace_back(toKey2IndexT(lvl1, keyStorage_));
+    meta_.emplace_back(toKey2IndexT(lvl2, keyStorage_));
+    meta_.emplace_back(toKey2IndexT(lvl3, keyStorage_));
+    meta_.emplace_back(toKey2IndexT(lvl4, keyStorage_));
 }
 
 ContBuilder::~ContBuilder()
 {}
+
+ContBuilder::ContBuilder(const ContBuilder &cont)
+{
+    delimeter_ = cont.delimeter_;
+    meta_.reserve(cont.meta_.size());
+    keyStorage_.reserve(cont.keyStorage_.size());
+    for(auto &mit: cont.meta_)
+    {
+        meta_.emplace_back(Key2IndexT());
+        auto &level = meta_.back();
+        for(auto &it: mit)
+        {
+            keyStorage_.emplace_back(make_unique(it.first));
+            level[keyStorage_.back().get()] = it.second;
+        }
+    }
+}
+
+ContBuilder& ContBuilder::operator=(ContBuilder cont)
+{
+    delimeter_ = cont.delimeter_;
+    std::swap(keyStorage_, cont.keyStorage_);
+    std::swap(meta_, cont.meta_);
+    return *this;
+}
+
 
 size_t ContBuilder::levels()const noexcept
 {
@@ -51,8 +100,9 @@ size_t ContBuilder::levels()const noexcept
 }
 
 size_t ContBuilder::suffixCount(
-            SuffixLevel level)const
+            SuffixLevel level)const noexcept
 {
+    assert(level < meta_.size());
     return meta_[level].size();
 }
 
@@ -64,7 +114,7 @@ bool ContBuilder::getKeyIndex(
             size_t &index)const
 {
     const Key2IndexT &levelKeys = meta_[level];
-    std::string k(key.c_str() + startIdx,  endIdx - startIdx);
+    KeyViewT k(key.c_str() + startIdx,  endIdx - startIdx);
     auto it = levelKeys.find(k);
     if(std::end(levelKeys) == it)
         return false;
@@ -80,16 +130,15 @@ void ContBuilder::getNewKeyIndex(
             size_t &index)
 {
     Key2IndexT &levelKeys = meta_[level];
-    std::string k(key.c_str() + startIdx,  endIdx - startIdx);
-    if(k.empty())
-        levelKeys.find(k);
+    KeyViewT k(key.c_str() + startIdx,  endIdx - startIdx);
     auto it = levelKeys.find(k);
     if(std::end(levelKeys) != it){
         index = it->second;
         return;
     }
     index = levelKeys.size();
-    levelKeys[k] = index;
+    keyStorage_.push_back(make_unique(k));
+    levelKeys[keyStorage_.back().get()] = index;
 }
 
 bool ContBuilder::parseKey(
@@ -138,14 +187,6 @@ bool ContBuilder::parseNewKey(
         bufferPtr = ptr + 1;
     }
 
-    /*for(size_t i = 0; i < totalLen; ++i){
-        if(delimeter_ == key[i]){
-            tokenLastPosition[currLevel] = i;
-            ++currLevel;
-            if(total_Suffix <= currLevel) /// too many tokens in key
-                return false;
-        }
-    }*/
     if(total_Suffix != currLevel + 1)
         return false;
     tokenLastPosition[currLevel] = totalLen;
@@ -162,7 +203,7 @@ bool ContBuilder::parseNewKey(
 }
 
 KeyT ContBuilder::assembleKey(
-            const ParsedKeyT &key)
+            const ParsedKeyT &key)const
 {
     KeyT resultKey;
     ///todo: implement it
