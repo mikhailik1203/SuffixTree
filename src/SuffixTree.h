@@ -352,7 +352,10 @@ namespace suffix_tree_impl{
         {
             if(values_.size() <= index){
                 values_.resize(index + 1, NodeTraitsT::defaultValue());
-                optional_.resize(index + 1, false);
+                optional_.resize(index + 1, VALUE_MISSED);
+                values_[index] = val;
+                optional_[index] = VALUE_EXIST;
+                return true;
             }
 
             values_[index] = val;
@@ -600,12 +603,12 @@ public:
         if(!builder_.parseNewKey(key, parsedKey))
             return end();
         size_t index = 0;
-
+        size_t leafIndex = parsedKey[ContBuilderT::leaf_Suffix];
         auto insertFunc = [&, this](LeafNodeT *node)->ThisTypeT::Iterator
             {
-                if(node->set(parsedKey[index], val))
+                if(node->set(leafIndex, val))
                     ++size_;
-                return ThisTypeT::Iterator(node, parsedKey[index]);
+                return ThisTypeT::Iterator(node, leafIndex);
             };
 
         return applyFunc(root_.get(), parsedKey, index, insertFunc);
@@ -617,12 +620,12 @@ public:
         if(!builder_.parseKey(key, parsedKey))
             return end();
         size_t index = 0;
-
+        size_t leafIndex = parsedKey[ContBuilderT::leaf_Suffix];
         auto findFunc = [&, this](LeafNodeT *node)->ThisTypeT::Iterator
             {
-                if(!node->exist(parsedKey[index]))
+                if(!node->exist(leafIndex))
                     return end();
-                return ThisTypeT::Iterator(node, parsedKey[index]);
+                return ThisTypeT::Iterator(node, leafIndex);
             };
 
         return applyFunc(root_.get(), parsedKey, index, findFunc);
@@ -634,11 +637,11 @@ public:
         if(!builder_.parseKey(key, parsedKey))
             return end();
         size_t index = 0;
-
+        size_t leafIndex = parsedKey[ContBuilderT::leaf_Suffix];
         auto eraseFunc = [&, this](LeafNodeT *node)->ThisTypeT::Iterator
             {
-                auto nextIt = ThisTypeT::Iterator(node, parsedKey[index]).next();
-                if(node->erase(parsedKey[index]))
+                auto nextIt = ThisTypeT::Iterator(node, leafIndex).next();
+                if(node->erase(leafIndex))
                     --size_;
                 return nextIt;
             };

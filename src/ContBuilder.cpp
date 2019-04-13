@@ -5,49 +5,13 @@ using namespace suffix_tree;
 using namespace aux;
 
 namespace{
-    Key2IndexT toKey2IndexT(const Key2IdxT &vals)
-    {
-        Key2IndexT res;
-        std::for_each(
-            std::begin(vals), std::end(vals),
-            [&](const KeyT &v)
-            {
-                res[v.c_str()] = res.size();
-            });
-        return res;
-    }
-
-    std::unique_ptr<const char[]> make_unique(std::string_view str) {
-        size_t count = str.size();
-        std::unique_ptr<char[]> p (new char [count + 1]);
-        memcpy(p.get(), str.data(), count + 1);
-        p.get()[count] = 0;
-        return move(p);
-    }
-
-    Key2IndexT toKey2IndexT(const Key2IdxT &vals, std::vector<std::unique_ptr<const char[]>> &storage)
-    {
-        Key2IndexT res;
-        std::for_each(
-                std::begin(vals), std::end(vals),
-                [&](const KeyT &v)
-                {
-                    storage.emplace_back(make_unique(v));
-                    res[storage.back().get()] = res.size();
-                });
-        return res;
-    }
 
 }
 
 ContBuilder::ContBuilder(char delimeter):
+    keys_(total_Suffix),
     delimeter_(delimeter)
-{
-    meta_.reserve(total_Suffix);
-    for(size_t i = 0; i < total_Suffix; ++i){
-        meta_.push_back(Key2IndexT());
-    }
-}
+{}
 
 ContBuilder::ContBuilder(
         const Key2IdxT &lvl1, 
@@ -55,55 +19,37 @@ ContBuilder::ContBuilder(
         const Key2IdxT &lvl3, 
         const Key2IdxT &lvl4,
         char delimeter):
+    keys_(lvl1, lvl2, lvl3, lvl4),
     delimeter_(delimeter)
-{
-    meta_.reserve(4);
-    keyStorage_.reserve(lvl1.size() + lvl2.size() + lvl3.size() + lvl4.size());
-    meta_.emplace_back(toKey2IndexT(lvl1, keyStorage_));
-    meta_.emplace_back(toKey2IndexT(lvl2, keyStorage_));
-    meta_.emplace_back(toKey2IndexT(lvl3, keyStorage_));
-    meta_.emplace_back(toKey2IndexT(lvl4, keyStorage_));
-}
+{}
 
 ContBuilder::~ContBuilder()
 {}
 
-ContBuilder::ContBuilder(const ContBuilder &cont)
+ContBuilder::ContBuilder(const ContBuilder &cont):
+    keys_(total_Suffix)
 {
     delimeter_ = cont.delimeter_;
-    meta_.reserve(cont.meta_.size());
-    keyStorage_.reserve(cont.keyStorage_.size());
-    for(auto &mit: cont.meta_)
-    {
-        meta_.emplace_back(Key2IndexT());
-        auto &level = meta_.back();
-        for(auto &it: mit)
-        {
-            keyStorage_.emplace_back(make_unique(it.first));
-            level[keyStorage_.back().get()] = it.second;
-        }
-    }
+    keys_ = cont.keys_;
 }
 
 ContBuilder& ContBuilder::operator=(ContBuilder cont)
 {
     delimeter_ = cont.delimeter_;
-    std::swap(keyStorage_, cont.keyStorage_);
-    std::swap(meta_, cont.meta_);
+    std::swap(keys_, cont.keys_);
     return *this;
 }
 
 
 size_t ContBuilder::levels()const noexcept
 {
-    return meta_.size();
+    return total_Suffix;
 }
 
 size_t ContBuilder::suffixCount(
             SuffixLevel level)const noexcept
 {
-    assert(level < meta_.size());
-    return meta_[level].size();
+    return keys_.suffixCount(level);
 }
 
 bool ContBuilder::getKeyIndex(
@@ -113,7 +59,7 @@ bool ContBuilder::getKeyIndex(
             size_t endIdx, 
             size_t &index)const
 {
-    const Key2IndexT &levelKeys = meta_[level];
+    const Key2IndexT &levelKeys = keys_.level(level);
     KeyViewT k(key.c_str() + startIdx,  endIdx - startIdx);
     auto it = levelKeys.find(k);
     if(std::end(levelKeys) == it)
@@ -129,16 +75,14 @@ void ContBuilder::getNewKeyIndex(
             size_t endIdx,
             size_t &index)
 {
-    Key2IndexT &levelKeys = meta_[level];
+    const Key2IndexT &levelKeys = keys_.level(level);
     KeyViewT k(key.c_str() + startIdx,  endIdx - startIdx);
     auto it = levelKeys.find(k);
     if(std::end(levelKeys) != it){
         index = it->second;
         return;
     }
-    index = levelKeys.size();
-    keyStorage_.push_back(make_unique(k));
-    levelKeys[keyStorage_.back().get()] = index;
+    index = keys_.addKey(level, k);
 }
 
 bool ContBuilder::parseKey(

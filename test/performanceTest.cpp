@@ -35,8 +35,7 @@ namespace tst{
             auto it = cont.insert(vals.genKeys_[i], i);
             //totalCount += it.value();
             totalCount += i;
-
-                    ++i;
+            ++i;
         }
     }
 
@@ -218,8 +217,8 @@ namespace tst{
                           << " , KeysCount = " << vals.keysCount_
                           << " --------------------------------" << std::endl;
 
-                for(size_t i = 0; i < 3; ++i){
-                    std::random_shuffle(std::begin(vals.genKeys_), std::end(vals.genKeys_));
+                std::random_shuffle(std::begin(vals.genKeys_), std::end(vals.genKeys_));
+                for(size_t i = 0; i < 5; ++i){
                     insertSuffixTreeTest(vals);
                 }
             }

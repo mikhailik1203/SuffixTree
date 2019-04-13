@@ -6,13 +6,14 @@
 #include <memory>
 #include "SuffixTree.h"
 #include "ContAllocator.h"
+#include "ContBuilderKeys.h"
 
 namespace aux {
 
-    typedef std::string KeyT;
+    /*typedef std::string KeyT;
     typedef std::string_view KeyViewT;
     typedef std::vector<KeyT> Key2IdxT;
-    typedef std::unordered_map<KeyViewT, size_t> Key2IndexT;
+    typedef std::unordered_map<KeyViewT, size_t> Key2IndexT;*/
 
     class ContBuilder {
     public:
@@ -88,11 +89,7 @@ namespace aux {
                 size_t &index);
 
     private:
-        typedef std::vector<Key2IndexT> MetaDataPerLevelsT;
-        typedef std::vector<std::unique_ptr<const char[]>> KeyStorageT;
-
-        KeyStorageT keyStorage_;
-        MetaDataPerLevelsT meta_;
+        ContBuilderKeys keys_;
         char delimeter_;
     };
 
