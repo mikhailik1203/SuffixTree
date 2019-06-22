@@ -23,9 +23,37 @@ namespace aux {
         explicit ContBuilderKeys(size_t levelCount);
         ContBuilderKeys(
                 const Key2IdxT &lvl1,
+                const Key2IdxT &lvl2);
+        ContBuilderKeys(
+                const Key2IdxT &lvl1,
+                const Key2IdxT &lvl2,
+                const Key2IdxT &lvl3);
+        ContBuilderKeys(
+                const Key2IdxT &lvl1,
                 const Key2IdxT &lvl2,
                 const Key2IdxT &lvl3,
                 const Key2IdxT &lvl4);
+        ContBuilderKeys(
+                const Key2IdxT &lvl1,
+                const Key2IdxT &lvl2,
+                const Key2IdxT &lvl3,
+                const Key2IdxT &lvl4,
+                const Key2IdxT &lvl5);
+        ContBuilderKeys(
+                const Key2IdxT &lvl1,
+                const Key2IdxT &lvl2,
+                const Key2IdxT &lvl3,
+                const Key2IdxT &lvl4,
+                const Key2IdxT &lvl5,
+                const Key2IdxT &lvl6);
+        ContBuilderKeys(
+                const Key2IdxT &lvl1,
+                const Key2IdxT &lvl2,
+                const Key2IdxT &lvl3,
+                const Key2IdxT &lvl4,
+                const Key2IdxT &lvl5,
+                const Key2IdxT &lvl6,
+                const Key2IdxT &lvl7);
 
         ContBuilderKeys(const ContBuilderKeys &);
         ContBuilderKeys &operator=(const ContBuilderKeys &cont);

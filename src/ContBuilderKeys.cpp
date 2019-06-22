@@ -31,10 +31,31 @@ ContBuilderKeys::ContBuilderKeys(size_t levelCount):
     stringAllocator_(32, 1024, 2.0, std::numeric_limits<int>::max())
 {
     meta_.reserve(levelCount);
-    //keyStorage_.reserve(1000);
     for(size_t i = 0; i < levelCount; ++i){
         meta_.push_back(Key2IndexT());
     }
+}
+
+ContBuilderKeys::ContBuilderKeys(
+        const Key2IdxT &lvl1,
+        const Key2IdxT &lvl2):
+        stringAllocator_(32, 1024, 2.0, std::numeric_limits<int>::max())
+{
+    meta_.reserve(2);
+    meta_.emplace_back(toKey2IndexT(lvl1, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl2, stringAllocator_));
+}
+
+ContBuilderKeys::ContBuilderKeys(
+        const Key2IdxT &lvl1,
+        const Key2IdxT &lvl2,
+        const Key2IdxT &lvl3):
+        stringAllocator_(32, 1024, 2.0, std::numeric_limits<int>::max())
+{
+    meta_.reserve(3);
+    meta_.emplace_back(toKey2IndexT(lvl1, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl2, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl3, stringAllocator_));
 }
 
 ContBuilderKeys::ContBuilderKeys(
@@ -45,11 +66,64 @@ ContBuilderKeys::ContBuilderKeys(
     stringAllocator_(32, 1024, 2.0, std::numeric_limits<int>::max())
 {
     meta_.reserve(4);
-    //keyStorage_.reserve(lvl1.size() + lvl2.size() + lvl3.size() + lvl4.size());
     meta_.emplace_back(toKey2IndexT(lvl1, stringAllocator_));
     meta_.emplace_back(toKey2IndexT(lvl2, stringAllocator_));
     meta_.emplace_back(toKey2IndexT(lvl3, stringAllocator_));
     meta_.emplace_back(toKey2IndexT(lvl4, stringAllocator_));
+}
+
+ContBuilderKeys::ContBuilderKeys(
+        const Key2IdxT &lvl1,
+        const Key2IdxT &lvl2,
+        const Key2IdxT &lvl3,
+        const Key2IdxT &lvl4,
+        const Key2IdxT &lvl5):
+        stringAllocator_(32, 1024, 2.0, std::numeric_limits<int>::max())
+{
+    meta_.reserve(5);
+    meta_.emplace_back(toKey2IndexT(lvl1, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl2, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl3, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl4, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl5, stringAllocator_));
+}
+
+ContBuilderKeys::ContBuilderKeys(
+        const Key2IdxT &lvl1,
+        const Key2IdxT &lvl2,
+        const Key2IdxT &lvl3,
+        const Key2IdxT &lvl4,
+        const Key2IdxT &lvl5,
+        const Key2IdxT &lvl6):
+        stringAllocator_(32, 1024, 2.0, std::numeric_limits<int>::max())
+{
+    meta_.reserve(6);
+    meta_.emplace_back(toKey2IndexT(lvl1, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl2, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl3, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl4, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl5, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl6, stringAllocator_));
+}
+
+ContBuilderKeys::ContBuilderKeys(
+        const Key2IdxT &lvl1,
+        const Key2IdxT &lvl2,
+        const Key2IdxT &lvl3,
+        const Key2IdxT &lvl4,
+        const Key2IdxT &lvl5,
+        const Key2IdxT &lvl6,
+        const Key2IdxT &lvl7):
+        stringAllocator_(32, 1024, 2.0, std::numeric_limits<int>::max())
+{
+    meta_.reserve(7);
+    meta_.emplace_back(toKey2IndexT(lvl1, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl2, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl3, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl4, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl5, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl6, stringAllocator_));
+    meta_.emplace_back(toKey2IndexT(lvl7, stringAllocator_));
 }
 
 ContBuilderKeys::ContBuilderKeys(const ContBuilderKeys &keys):

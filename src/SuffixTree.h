@@ -1,585 +1,162 @@
+//
+// Created by sam1203 on 6/7/19.
+//
 #pragma once
 
-#include <vector>
-#include <limits>
 #include <memory>
-#include <algorithm>
 #include <functional>
-#include <boost/dynamic_bitset.hpp>
 
-#include "ContAllocator.h"
+#include "SuffixTreeImpl.h"
 
 namespace suffix_tree{
 
-namespace suffix_tree_impl{
-    const size_t INVALID_INDEX = std::numeric_limits<size_t>::max();
-
-    template<typename MetaT, typename MetaT::SuffixLevel NodeLevelT, typename ContAllocatorT>
-    class SuffixNode;
-    template<typename MetaT, typename ValueT, typename ContAllocatorT>
-    class LeafNode;
-
-    template<typename MetaT, typename ContAllocatorT>
-    class RootNode
+    template<typename ContT>
+    class SuffixTreeIterator : public std::iterator<std::forward_iterator_tag, typename ContT::ValueT>
     {
-        static const typename MetaT::SuffixLevel NODE_LEVEL = MetaT::root_Suffix;
-        static const typename MetaT::SuffixLevel NEXT_NODE_LEVEL = static_cast<typename MetaT::SuffixLevel>(MetaT::root_Suffix + 1);
-        typedef typename MetaT::template NodeTraits<ContAllocatorT, NODE_LEVEL>::ChildNodeT ChildNodeT;
-        typedef typename ContAllocatorT::template AllocatorT<NEXT_NODE_LEVEL>::NodePtrT ChildNodePtrT;
-        typedef std::vector<ChildNodeT *> SubNotesT;
+        typedef typename ContT::ValueT ValueT;
+        typedef typename ContT::LeafNodeT LeafNodeT;
 
+        friend ContT;
     public:
-        RootNode(
-                const MetaT &metaInfo,
-                ContAllocatorT &allocator):
-            metaInfo_(metaInfo), allocator_(allocator)
+        SuffixTreeIterator():
+                node_(nullptr), index_(suffix_tree_impl::INVALID_INDEX)
+        {}
+
+        SuffixTreeIterator(
+                const SuffixTreeIterator& it):
+                node_(it.node_), index_(it.index_)
+        {}
+
+        SuffixTreeIterator &operator=(
+                SuffixTreeIterator it)
         {
-            childNodes_.assign(metaInfo_.suffixCount(NODE_LEVEL), nullptr);
+            std::swap(it.index_, this->index_);
+            std::swap(it.node_, this->node_);
+            return *this;
         }
 
-        ~RootNode()
+        ~SuffixTreeIterator() = default;
+
+        ValueT& operator*(){
+            if(nullptr == node_)
+                throw std::runtime_error("SuffixTreeIterator::op*: Invalid level at SuffixTreeIterator!");
+            return node_->get(index_);
+        }
+
+        ValueT value()const
+        {
+            if(nullptr == node_)
+                throw std::runtime_error("SuffixTreeIterator::value: Invalid level at SuffixTreeIterator!");
+            return node_->get(index_);
+        }
+
+        bool operator==(
+                const SuffixTreeIterator &val)const noexcept
+        {
+            return node_ == val.node_ && index_ == val.index_;
+        }
+        bool operator!=(
+                const SuffixTreeIterator &val)const noexcept
+        {
+            return node_ != val.node_ || index_ != val.index_;
+        }
+
+        SuffixTreeIterator next()const
+        {
+            if(nullptr == node_ || suffix_tree_impl::INVALID_INDEX == index_)
+                return SuffixTreeIterator();
+            size_t nextIdx = node_->next(index_);
+            if(suffix_tree_impl::INVALID_INDEX != nextIdx)
+                return SuffixTreeIterator(node_, nextIdx);
+
+            auto *prntNode = node_->parent();
+            if(nullptr == prntNode)
+                return SuffixTreeIterator();
+            auto * nextNode = prntNode->nextNode(node_);
+            if(nullptr == nextNode)
+                return SuffixTreeIterator();
+            return SuffixTreeIterator(nextNode, nextNode->begin());
+        }
+
+        SuffixTreeIterator& operator++()
+        {
+            next();
+            return *this;
+        }
+
+        SuffixTreeIterator operator++(int)
+        {
+            SuffixTreeIterator tmp(*this);
+            operator++();
+            return tmp;
+        }
+
+    protected:
+        SuffixTreeIterator(
+                const LeafNodeT *level,
+                size_t index):
+                node_(level), index_(index)
+        {
+            if(suffix_tree_impl::INVALID_INDEX == index_)
+                node_ = nullptr;
+        }
+
+        const LeafNodeT *node()const noexcept{return node_;}
+
+        size_t index()const noexcept{return index_;}
+
+    private:
+        const LeafNodeT *node_;
+        size_t index_;
+    };
+
+    template<class ContTraitsT>
+    class SuffixTree
+    {
+    public:
+        typedef ContTraitsT TraitsT;
+        typedef typename TraitsT::KeyT KeyT;
+        typedef typename TraitsT::ValueT ValueT;
+        typedef SuffixTree<ContTraitsT> ThisTypeT;
+        typedef SuffixTreeIterator<ThisTypeT> Iterator;
+        typedef typename ContTraitsT::template NodeTraits<ContTraitsT::SuffixLevel::leaf_Suffix, void>::NodeTypeT LeafNodeT;
+        typedef std::function<Iterator(LeafNodeT *node)> NodeFunctorT;
+        typedef std::function<Iterator(const LeafNodeT *node)> CNodeFunctorT;
+        typedef suffix_tree_impl::RootNode<TraitsT> RootNodeT;
+        typedef std::unique_ptr<RootNodeT> RootNodePtrT;
+
+    public:
+        explicit SuffixTree(
+                const TraitsT &traits):
+                traits_(traits),
+                root_(new RootNodeT(traits_)),
+                size_(0)
+        {
+        }
+
+        ~SuffixTree()
         {
             clear();
         }
 
-        RootNode(
-                const RootNode &nd,
-                const MetaT &metaInfo,
-                ContAllocatorT &allocator):
-            metaInfo_(metaInfo),
-            allocator_(allocator)
+        SuffixTree(
+                const SuffixTree &sft):
+                traits_(sft.traits_),
+                root_(new RootNodeT(*sft.root_, traits_)),
+                size_(sft.size_)
+        {}
+
+        SuffixTree &operator=(
+                SuffixTree sft)
         {
-            SubNotesT tmp;
-            tmp.reserve(nd.childNodes_.size());  
-            std::for_each(
-                std::begin(nd.childNodes_), std::end(nd.childNodes_), 
-                [&](const ChildNodeT *val){
-                    if(nullptr != val){
-                        ChildNodePtrT chld = allocator_.template allocator<NEXT_NODE_LEVEL>().
-                                make_unique(*val, allocator_, this, tmp.size(), metaInfo_);
-                        tmp.emplace_back(chld.get());
-                        chld.release();
-                    }else
-                        tmp.emplace_back(nullptr);
-                });
-            std::swap(tmp, childNodes_);
+            std::swap(traits_, sft.traits_);
+            root_ = sft.root_;
+            size_ = sft.size_;
         }
 
-        RootNode &operator=(
-                const RootNode nd)
+        Iterator begin()const
         {
-            std::swap(metaInfo_, nd.metaInfo_);
-            std::swap(childNodes_, nd.childNodes_);
-        }
-
-        ChildNodeT *getChild(
-                size_t index)
-        {
-            if(childNodes_.size() <= index)
-                childNodes_.resize(index + 1, nullptr);
-            if(nullptr == childNodes_[index])
-                childNodes_[index] = allocator_.template allocator<NEXT_NODE_LEVEL>().
-                        create(allocator_, this, index, metaInfo_);
-            return childNodes_[index];
-        }
-
-        ChildNodeT *findChild(
-                size_t index)noexcept
-        {
-            if(childNodes_.size() <= index)
-                return nullptr;
-            return childNodes_[index];
-        }
-
-        size_t next(
-                size_t index)const noexcept
-        {
-            if(childNodes_.size() <= index)
-                return INVALID_INDEX;
-
-            auto childNodeCount = childNodes_.size();
-            for(size_t i = index + 1; i < childNodeCount; ++i)
-            {
-                if(nullptr != childNodes_[i])
-                    return i;
-            }
-            return INVALID_INDEX;
-        }
-
-        const ChildNodeT *begin()const noexcept
-        {
-            auto it = std::find_if(
-                    std::begin(childNodes_),
-                    std::end(childNodes_),
-                    [](const ChildNodeT * val){return nullptr != val;});
-            if(std::end(childNodes_) == it)
-                return nullptr;
-            return *it;
-        }
-
-        const ChildNodeT *nextNode(
-                const ChildNodeT *node)const
-        {
-            auto it = std::find(
-                            std::begin(childNodes_), std::end(childNodes_), node);
-            if(std::end(childNodes_) == it)
-                return nullptr;
-
-            ++it;
-            auto nextIt = std::find_if(
-                            it, std::end(childNodes_), 
-                            [](const ChildNodeT *val){return nullptr != val;});
-            if(std::end(childNodes_) != nextIt && nullptr != *nextIt)
-                return *nextIt;
-            return nullptr;
-        }
-
-        void clear()
-        {
-            SubNotesT tmp;
-            std::swap(tmp, childNodes_);
-
-            auto &alloc = allocator_.template allocator<NEXT_NODE_LEVEL>();
-            std::for_each(std::begin(tmp), std::end(tmp),
-                [&alloc](ChildNodeT *val){alloc.destroy(val);});
-        }
-
-    private:
-        SubNotesT childNodes_;
-        const MetaT &metaInfo_;
-        ContAllocatorT &allocator_;
-    };
-
-    template<typename MetaT, typename MetaT::SuffixLevel NODE_LEVEL, typename ContAllocatorT>
-    class SuffixNode
-    {
-        typedef typename MetaT::template NodeTraits<ContAllocatorT, NODE_LEVEL> NodeTraitsT;
-        typedef typename NodeTraitsT::ParentNodeT ParentNodeT;
-        typedef typename NodeTraitsT::ChildNodeT ChildNodeT;
-        typedef std::vector<ChildNodeT *> SubNotesT;
-
-        static const typename MetaT::SuffixLevel NEXT_NODE_LEVEL = static_cast<typename MetaT::SuffixLevel>(NODE_LEVEL + 1);
-        typedef typename ContAllocatorT::template AllocatorT<NEXT_NODE_LEVEL>::NodePtrT ChildNodePtrT;
-
-    public:
-        SuffixNode(
-                ContAllocatorT &allocator,
-                ParentNodeT *parentNode,
-                size_t index,
-                const MetaT &metaInfo):
-            allocator_(allocator), metaInfo_(metaInfo),
-            parentNode_(parentNode), selfIndex_(index)
-        {
-            childNodes_.assign(metaInfo_.suffixCount(NODE_LEVEL), nullptr);    
-        }
-
-        SuffixNode(
-                const SuffixNode &nd,
-                ContAllocatorT &allocator,
-                ParentNodeT *parentNode,
-                size_t index,
-                const MetaT &metaInfo):
-            allocator_(allocator), metaInfo_(metaInfo),
-            parentNode_(parentNode), selfIndex_(index)
-        {
-            SubNotesT tmp;
-            tmp.reserve(nd.childNodes_.size());
-            std::for_each(
-                    std::begin(nd.childNodes_), std::end(nd.childNodes_),
-                    [&](const ChildNodeT *val){
-                        if(nullptr != val){
-                            ChildNodePtrT chld = allocator_.template allocator<NEXT_NODE_LEVEL>().
-                                    make_unique(*val, allocator_, this, tmp.size(), metaInfo_);
-                            tmp.emplace_back(chld.get());
-                            chld.release();
-                        }else
-                            tmp.emplace_back(nullptr);
-                    });
-            std::swap(tmp, childNodes_);
-            selfIndex_ = nd.selfIndex_;
-        }
-
-        ~SuffixNode()
-        {
-            clear();
-        }
-
-        SuffixNode(const SuffixNode &nd) = delete;
-        SuffixNode &operator=(const SuffixNode nd) = delete;
-
-        ChildNodeT *getChild(
-                size_t index)
-        {
-            if(childNodes_.size() <= index)
-                childNodes_.resize(index + 1, nullptr);
-
-            if(nullptr == childNodes_[index])
-                childNodes_[index] = allocator_.template allocator<NEXT_NODE_LEVEL>().
-                        create(allocator_, this, index, metaInfo_);
-
-            return childNodes_[index];
-        }
-
-        ChildNodeT *findChild(
-                size_t index)const noexcept
-        {
-            if(childNodes_.size() < index)
-                return nullptr;
-
-            return childNodes_[index];
-        }
-
-        size_t next(
-                size_t index)const noexcept
-        {
-            if(childNodes_.size() <= index)
-                return INVALID_INDEX;
-
-            auto childNodeCount = childNodes_.size();
-            for(size_t i = index + 1; i < childNodeCount; ++i)
-            {
-                if(nullptr != childNodes_[i])
-                    return i;
-            }
-            return INVALID_INDEX;
-        }
-
-        const ChildNodeT *begin()const
-        {
-            auto it = std::find_if(
-                        std::begin(childNodes_), std::end(childNodes_), 
-                        [](const ChildNodeT * val){return nullptr != val;});
-            if(std::end(childNodes_) == it)
-                return nullptr;
-            return *it;
-        }
-
-        const ChildNodeT *nextNode(
-                const ChildNodeT *node)const
-        {
-            typename SubNotesT::const_iterator it = std::find(
-                            std::begin(childNodes_), std::end(childNodes_), node);
-            if(std::end(childNodes_) == it)
-                return nullptr;
-
-            ++it;
-            auto nextIt = std::find_if(
-                            it, childNodes_.end(), 
-                            [](const ChildNodeT *val){return nullptr != val;});
-            if(childNodes_.end() != nextIt && nullptr != *nextIt)
-                return *nextIt;
-
-            auto nextNode = parentNode_->nextNode(this);
-            if(nullptr != nextNode)
-                return nextNode->begin();
-            return nullptr;
-        }
-
-        void clear()
-        {
-            SubNotesT tmp(metaInfo_.suffixCount(NODE_LEVEL), nullptr);
-            std::swap(tmp, childNodes_);
-
-            auto &alloc = allocator_.template allocator<NEXT_NODE_LEVEL>();
-            std::for_each(
-                std::begin(tmp), std::end(tmp), 
-                [&alloc](ChildNodeT *val){alloc.destroy(val);});
-        }
-
-    private:
-        const MetaT &metaInfo_;
-        ContAllocatorT &allocator_;
-        SubNotesT childNodes_;
-        ParentNodeT *parentNode_;
-        size_t selfIndex_;
-    };
-
-    template<typename MetaT, typename ValueT, typename ContAllocatorT>
-    class LeafNode
-    {
-        typedef typename MetaT::template NodeTraits<ContAllocatorT, MetaT::leaf_Suffix> NodeTraitsT;
-        typedef typename NodeTraitsT::ParentNodeT ParentNodeT;
-        typedef std::vector<ValueT> ValuesT;
-
-        static const bool VALUE_EXIST = true;
-        static const bool VALUE_MISSED = false;
-        typedef boost::dynamic_bitset<> ValueOptionalT;
-
-    public:
-        LeafNode(
-                ContAllocatorT &allocator,
-                ParentNodeT *parentNode,
-                size_t index,
-                const MetaT &metaInfo): 
-            parentNode_(parentNode), selfIndex_(index) 
-        {
-            size_t count = metaInfo.suffixCount(MetaT::leaf_Suffix);
-            values_.resize(count, NodeTraitsT::defaultValue());
-            optional_.resize(count, VALUE_MISSED);
-        }
-
-        LeafNode(
-                const LeafNode &nd,
-                ContAllocatorT &allocator,
-                ParentNodeT *parentNode,
-                size_t index,
-                const MetaT &metaInfo):
-            parentNode_(parentNode), selfIndex_(index)
-        {
-            ValuesT tmp;
-            tmp.reserve(nd.values_.size());
-            ValueOptionalT tmpOptional(nd.optional_);
-            std::for_each(
-                    std::begin(nd.values_), std::end(nd.values_),
-                    [&](const ValueT &val){
-                        tmp.push_back(val);
-                    });
-            std::swap(tmp, values_);
-            std::swap(tmpOptional, optional_);
-            selfIndex_ = nd.selfIndex_;
-        }
-
-        ~LeafNode() = default;
-
-        LeafNode(const LeafNode &nd) = delete;
-        LeafNode &operator=(const LeafNode nd) = delete;
-
-        const ValuesT &values()const noexcept{return values_;}
-
-        bool set(
-                size_t index,
-                const ValueT &val)
-        {
-            if(values_.size() <= index){
-                values_.resize(index + 1, NodeTraitsT::defaultValue());
-                optional_.resize(index + 1, VALUE_MISSED);
-                values_[index] = val;
-                optional_[index] = VALUE_EXIST;
-                return true;
-            }
-
-            values_[index] = val;
-            if(VALUE_EXIST == optional_[index])
-                return false;
-            optional_[index] = VALUE_EXIST;
-            return true;
-        }
-
-        ValueT &get(
-                size_t index)const
-        {
-            if((optional_.size() <= index) || (VALUE_MISSED == optional_[index]))
-                throw std::runtime_error("LeafNode::get: element is not exist at index");
-            return values_[index];
-        }
-
-        bool exist(
-                size_t index)const noexcept
-        {
-            return (optional_.size() > index) && (VALUE_EXIST == optional_[index]);
-        }
-
-        bool erase(
-                size_t index)
-        {
-            if ((optional_.size() <= index) || (VALUE_MISSED == optional_[index]))
-                return false;
-            values_[index] = NodeTraitsT::defaultValue();
-            optional_[index] = VALUE_MISSED;
-            return true;
-        }
-
-        size_t next(
-                size_t index)const noexcept
-        {
-            auto idx = optional_.find_next(index);
-            if(ValueOptionalT::npos == idx)
-                return INVALID_INDEX;
-            return idx;
-        }
-
-        size_t begin()const noexcept
-        {
-            auto idx = optional_.find_first();
-            if(ValueOptionalT::npos == idx)
-                return INVALID_INDEX;
-            return idx;
-        }
-
-
-        void clear()
-        {
-            size_t count = optional_.size();
-            values_.clear();
-            values_.resize(count, ValueT());
-            optional_.clear();
-            optional_.resize(count, VALUE_MISSED);
-        }
-
-        const ParentNodeT *parent()const noexcept{return parentNode_;}
-
-    private:
-        ParentNodeT *parentNode_;
-        mutable ValuesT values_;
-        ValueOptionalT optional_;
-        size_t selfIndex_;
-    };
-
-}
-
-template<typename ContT>
-class SuffixTreeIterator : public std::iterator<std::forward_iterator_tag, typename ContT::ValueT>
-{
-    typedef typename ContT::ValueT ValueT;
-    typedef typename ContT::LeafNodeT LeafNodeT;
-    
-    friend ContT;
-public:
-    SuffixTreeIterator(): 
-        node_(nullptr), index_(suffix_tree_impl::INVALID_INDEX)
-    {}
-
-    SuffixTreeIterator(
-            const SuffixTreeIterator& it): 
-        node_(it.node_), index_(it.index_)
-    {}
-
-    SuffixTreeIterator &operator=(
-            SuffixTreeIterator it)
-    {
-        std::swap(it.index_, this->index_);
-        std::swap(it.node_, this->node_);
-        return *this;
-    }
-
-    ~SuffixTreeIterator() = default;
-
-    ValueT& operator*(){
-        if(nullptr == node_)
-            throw std::runtime_error("SuffixTreeIterator::op*: Invalid level at SuffixTreeIterator!");
-        return node_->get(index_);
-    }
-
-    ValueT value()const
-    {
-        if(nullptr == node_)
-            throw std::runtime_error("SuffixTreeIterator::value: Invalid level at SuffixTreeIterator!");
-        return node_->get(index_);
-    }
-
-    bool operator==(
-            const SuffixTreeIterator &val)const noexcept
-    {
-        return node_ == val.node_ && index_ == val.index_;
-    }
-    bool operator!=(
-            const SuffixTreeIterator &val)const noexcept
-    {
-        return node_ != val.node_ || index_ != val.index_;
-    }
-
-    SuffixTreeIterator next()const
-    {
-        if(nullptr == node_ || suffix_tree_impl::INVALID_INDEX == index_)
-            return SuffixTreeIterator();
-        size_t nextIdx = node_->next(index_);
-        if(suffix_tree_impl::INVALID_INDEX != nextIdx)
-            return SuffixTreeIterator(node_, nextIdx);
-
-        auto *prntNode = node_->parent();
-        if(nullptr == prntNode)
-            return SuffixTreeIterator();
-        auto *nextNode = prntNode->nextNode(node_);
-        if(nullptr == nextNode)
-            return SuffixTreeIterator();
-        return SuffixTreeIterator(nextNode, nextNode->begin());
-    }
-
-    SuffixTreeIterator& operator++() 
-    {
-        next();
-        return *this;
-    }
-
-    SuffixTreeIterator operator++(int)
-    {
-        SuffixTreeIterator tmp(*this); 
-        operator++(); 
-        return tmp;
-    }
-
-protected:
-    SuffixTreeIterator(
-            const LeafNodeT *level,
-            size_t index):
-        node_(level), index_(index)
-    {
-        if(suffix_tree_impl::INVALID_INDEX == index_)
-            node_ = nullptr;
-    }
-
-    const LeafNodeT *node()const noexcept{return node_;}
-
-    size_t index()const noexcept{return index_;}
-
-private:
-    const LeafNodeT *node_;
-    size_t index_;
-};
-
-template<class ContBuilderT,
-         typename KeyT,
-         typename ContValueT,
-         typename ContAllocatorT>
-class SuffixTree
-{
-public:
-    typedef ContBuilderT BuilderT;
-    typedef ContValueT ValueT;
-    typedef SuffixTree<ContBuilderT, KeyT, ContValueT, ContAllocatorT> ThisTypeT;
-    typedef SuffixTreeIterator<ThisTypeT> Iterator;
-    typedef typename ContBuilderT::template NodeTraits<ContAllocatorT, ContBuilderT::leaf_Suffix>::NodeTypeT LeafNodeT;
-    typedef std::function<Iterator(LeafNodeT *node)> NodeFunctorT;
-    typedef std::function<Iterator(const LeafNodeT *node)> CNodeFunctorT;
-    typedef suffix_tree_impl::RootNode<BuilderT, ContAllocatorT> RootNodeT;
-    typedef typename ContAllocatorT::RootNodeAllocT::NodePtrT RootNodePtrT;
-
-public:
-    explicit SuffixTree(
-            const BuilderT &builder):
-        builder_(builder),
-        allocator_(),
-        root_(allocator_.template allocator<ContBuilderT::root_Suffix>().
-              make_unique(builder_, allocator_)),
-        size_(0)
-    {
-    }
-
-    ~SuffixTree()
-    {
-        clear();
-    }
-
-    SuffixTree(
-            const SuffixTree &sft):
-        builder_(sft.builder_),
-        allocator_(),
-        root_(allocator_.template allocator<ContBuilderT::root_Suffix>().
-              make_unique(*sft.root_, builder_, allocator_)),
-        size_(sft.size_)
-    {}
-
-    SuffixTree &operator=(
-            SuffixTree sft)
-    {
-        std::swap(builder_, sft.builder_);
-        root_ = sft.root_;
-        size_ = sft.size_;
-    }
-
-    Iterator begin()const
-    {
-        auto findFunc = [&, this](const LeafNodeT *node)->ThisTypeT::Iterator
+            auto findFunc = [&, this](const LeafNodeT *node)->ThisTypeT::Iterator
             {
                 size_t idx = node->begin();
                 if(suffix_tree_impl::INVALID_INDEX == idx)
@@ -587,147 +164,133 @@ public:
                 return ThisTypeT::Iterator(node, idx);
             };
 
-        return applyFunc(root_.get(), findFunc);
-    }
+            return applyFunc(root_.get(), findFunc);
+        }
 
-    Iterator end()const noexcept
-    {
-        return Iterator();
-    }
+        Iterator end()const noexcept
+        {
+            return Iterator();
+        }
 
-    Iterator insert(
-            const KeyT &key, 
-            const ValueT &val)
-    {
-        typename ContBuilderT::ParsedKeyT parsedKey;
-        if(!builder_.parseNewKey(key, parsedKey))
-            return end();
-        size_t index = 0;
-        size_t leafIndex = parsedKey[ContBuilderT::leaf_Suffix];
-        auto insertFunc = [&, this](LeafNodeT *node)->ThisTypeT::Iterator
+        Iterator insert(
+                const KeyT &key,
+                const ValueT &val)
+        {
+            typename ContTraitsT::ParsedKeyT parsedKey;
+            if(!traits_.parseNewKey(key, parsedKey))
+                return end();
+            size_t index = 0;
+            size_t leafIndex = parsedKey[ContTraitsT::SuffixLevel::leaf_Suffix];
+            auto insertFunc = [&, this](LeafNodeT *node)->ThisTypeT::Iterator
             {
                 if(node->set(leafIndex, val))
                     ++size_;
                 return ThisTypeT::Iterator(node, leafIndex);
             };
 
-        return applyFunc(root_.get(), parsedKey, index, insertFunc);
-    }
+            return applyFunc(root_.get(), parsedKey, index, insertFunc);
+        }
 
-    Iterator find(const KeyT &key)const
-    {
-        typename ContBuilderT::ParsedKeyT parsedKey;
-        if(!builder_.parseKey(key, parsedKey))
-            return end();
-        size_t index = 0;
-        size_t leafIndex = parsedKey[ContBuilderT::leaf_Suffix];
-        auto findFunc = [&, this](LeafNodeT *node)->ThisTypeT::Iterator
+        Iterator find(const KeyT &key)const
+        {
+            typename ContTraitsT::ParsedKeyT parsedKey;
+            if(!traits_.parseKey(key, parsedKey))
+                return end();
+            size_t index = 0;
+            size_t leafIndex = parsedKey[ContTraitsT::SuffixLevel::leaf_Suffix];
+            auto findFunc = [&, this](LeafNodeT *node)->ThisTypeT::Iterator
             {
                 if(!node->exist(leafIndex))
                     return end();
                 return ThisTypeT::Iterator(node, leafIndex);
             };
 
-        return applyFunc(root_.get(), parsedKey, index, findFunc);
-    }
+            return applyFunc(root_.get(), parsedKey, index, findFunc);
+        }
 
-    Iterator erase(const KeyT &key)
-    {
-        typename ContBuilderT::ParsedKeyT parsedKey;
-        if(!builder_.parseKey(key, parsedKey))
-            return end();
-        size_t index = 0;
-        size_t leafIndex = parsedKey[ContBuilderT::leaf_Suffix];
-        auto eraseFunc = [&, this](LeafNodeT *node)->ThisTypeT::Iterator
+        Iterator erase(const KeyT &key)
+        {
+            typename ContTraitsT::ParsedKeyT parsedKey;
+            if(!traits_.parseKey(key, parsedKey))
+                return end();
+            size_t index = 0;
+            size_t leafIndex = parsedKey[ContTraitsT::SuffixLevel::leaf_Suffix];
+            auto eraseFunc = [&, this](LeafNodeT *node)->ThisTypeT::Iterator
             {
                 auto nextIt = ThisTypeT::Iterator(node, leafIndex).next();
                 if(node->erase(leafIndex))
                     --size_;
                 return nextIt;
             };
-        return applyFunc(root_.get(), parsedKey, index, eraseFunc);
-    }
+            return applyFunc(root_.get(), parsedKey, index, eraseFunc);
+        }
 
-    Iterator erase(const Iterator &it)
-    {
-        if(end() == it)
-            return end();
-        Iterator nextIt = it.next();
-        if(const_cast<typename Iterator::LeafNodeT *>(it.node())->erase(it.index()))
-            --size_;
-        return nextIt;
-    }
+        Iterator erase(const Iterator &it)
+        {
+            if(end() == it)
+                return end();
+            Iterator nextIt = it.next();
+            if(const_cast<typename Iterator::LeafNodeT *>(it.node())->erase(it.index()))
+                --size_;
+            return nextIt;
+        }
 
-    size_t size()const noexcept{return size_;}
+        size_t size()const noexcept{return size_;}
 
-    void clear()
-    {
-        size_ = 0;
-        root_->clear();
-    }
+        void clear()
+        {
+            size_ = 0;
+            root_->clear();
+        }
 
-private:
-    template<typename NodeT>
-    Iterator applyFunc(
-                NodeT *node, 
-                const typename ContBuilderT::ParsedKeyT &key, 
-                size_t &index, 
+    private:
+        template<typename NodeT>
+        Iterator applyFunc(
+                NodeT *node,
+                const typename ContTraitsT::ParsedKeyT &key,
+                size_t &index,
                 NodeFunctorT func)const
-    {
-        auto *childNode = node->getChild(key[index++]);
-        if(nullptr == childNode)
-            return end();
-        return applyFunc(childNode, key, index, func);
-    }
+        {
+            auto *childNode = node->getChild(key[index++]);
+            if(nullptr == childNode)
+                return end();
+            return applyFunc(childNode, key, index, func);
+        }
 
-    Iterator applyFunc(
-                suffix_tree_impl::SuffixNode<
-                        BuilderT,
-                        static_cast<typename BuilderT::SuffixLevel>(BuilderT::leaf_Suffix - 1),
-                        ContAllocatorT> *node,
-                const typename ContBuilderT::ParsedKeyT &key, 
-                size_t &index, 
+        Iterator applyFunc(
+                LeafNodeT *node,
+                const typename ContTraitsT::ParsedKeyT &key,
+                size_t &index,
                 NodeFunctorT func)const
-    {
-        auto *childNode = node->getChild(key[index++]);
-        if(nullptr == childNode)
-            return end();
-        return func(childNode);
-    }
+        {
+            return func(node);
+        }
 
-    template<typename NodeT>
-    Iterator applyFunc(
-                const NodeT *node, 
+        template<typename NodeT>
+        Iterator applyFunc(
+                const NodeT *node,
                 CNodeFunctorT func)const
-    {
-        auto *childNode = node->begin();
-        if(nullptr == childNode)
-            return end();
-        return applyFunc(childNode, func);
-    }
+        {
+            auto * childNode = node->begin();
+            if(nullptr == childNode)
+                return end();
+            return applyFunc(childNode, func);
+        }
 
-    Iterator applyFunc(
-                const suffix_tree_impl::SuffixNode<
-                        BuilderT,
-                        static_cast<typename BuilderT::SuffixLevel>(BuilderT::leaf_Suffix - 1),
-                        ContAllocatorT> *node,
+        Iterator applyFunc(
+                const LeafNodeT *node,
                 CNodeFunctorT func)const
-    {
-        const auto *childNode = node->begin();
-        if(nullptr == childNode)
-            return end();
-        return func(childNode);
-    }
+        {
+            return func(node);
+        }
 
-private:
-    BuilderT builder_;
-    ContAllocatorT allocator_;
+    private:
+        TraitsT traits_;
 
-    RootNodePtrT root_;
-    size_t size_;
-};
+        RootNodePtrT root_;
+        size_t size_;
+    };
 
 
 }
-
 
