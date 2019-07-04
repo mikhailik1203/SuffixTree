@@ -1,4 +1,4 @@
 # SuffixTree
-Fixed depth suffix tree, designed for minimum memory overhead per stored value
+Fixed depth suffix tree container, designed for the case when string key could be splitted to the unique suffixes. Container is optimised for minimum memory overhead per stored value and lower latency.
 
-Suported compiler: MSVC 2010
+Suported compiler: GCC 8
